@@ -1,0 +1,12 @@
+{
+  "name": "rpg-claude-test",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js"
+  },
+  "dependencies": {
+    "ws": "^8.17.0"
+  }
+}

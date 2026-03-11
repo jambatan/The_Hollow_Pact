@@ -1,0 +1,3224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RPG Dev Tools</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;font:13px/1.4 'Segoe UI',system-ui,sans-serif;background:#0d1117;color:#e6edf3}
+body{display:flex;flex-direction:column}
+/* ── header ── */
+#hdr{display:flex;align-items:center;gap:10px;padding:0 14px;height:44px;background:#161b22;border-bottom:1px solid #30363d;flex-shrink:0}
+#hdr h1{font-size:14px;color:#f0b429;white-space:nowrap}
+.tabs{display:flex;gap:2px}
+.tab-btn{padding:6px 14px;background:none;border:none;border-bottom:2px solid transparent;color:#8b949e;cursor:pointer;font:inherit;font-size:12px;transition:color .12s}
+.tab-btn:hover{color:#e6edf3}
+.tab-btn.active{color:#e6edf3;border-bottom-color:#58a6ff}
+#status{margin-left:auto;font-size:11px;padding:3px 10px;border-radius:4px;transition:opacity .3s}
+#status.ok{background:#1a4731;color:#3fb950}
+#status.err{background:#4a1a1a;color:#f85149}
+/* ── panels ── */
+#content{flex:1;display:flex;overflow:hidden}
+.panel{display:none;flex:1;overflow:hidden}
+.panel.active{display:flex}
+/* ── tile mapper ── */
+#tm-list{width:270px;flex-shrink:0;overflow-y:auto;border-right:1px solid #30363d;padding:4px 0}
+.tm-item{display:flex;align-items:center;gap:8px;padding:5px 10px;cursor:pointer;border-left:3px solid transparent}
+.tm-item:hover{background:#1c2128}
+.tm-item.sel{background:#1c2128;border-left-color:#58a6ff}
+.tm-spr{width:32px;height:32px;image-rendering:pixelated;border:1px solid #30363d;background:#111;flex-shrink:0}
+.tm-nm{font-size:12px;flex:1;line-height:1.2}
+.tm-id{font-size:10px;color:#8b949e}
+.cat-badge{font-size:10px;padding:1px 5px;border-radius:3px;background:#21262d;color:#8b949e}
+#tm-right{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#tm-bar{padding:7px 12px;background:#161b22;border-bottom:1px solid #30363d;display:flex;align-items:center;gap:10px;font-size:11px;color:#8b949e;flex-shrink:0}
+#tm-hint{flex:1}
+#tm-wrap{flex:1;overflow:auto;background:#111;cursor:crosshair}
+canvas{display:block;image-rendering:pixelated}
+/* ── generic editor layout ── */
+.ed-left{width:310px;flex-shrink:0;border-right:1px solid #30363d;display:flex;flex-direction:column}
+.ed-search{padding:7px 8px;border-bottom:1px solid #30363d;display:flex;gap:6px}
+.ed-search input,.ed-search select{background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:4px 8px;border-radius:4px;font:inherit;font-size:12px}
+.ed-search input{flex:1}
+.ed-rows{flex:1;overflow-y:auto}
+.ed-row{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid #21262d;cursor:pointer}
+.ed-row:hover{background:#1c2128}
+.ed-row.sel{background:#1c2128;border-left:3px solid #58a6ff;padding-left:9px}
+.ed-rid{font-size:10px;color:#8b949e;width:110px;overflow:hidden;text-overflow:ellipsis}
+.ed-rname{font-size:12px;flex:1}
+.badge{font-size:10px;padding:1px 5px;border-radius:3px}
+.b-weapon{background:#3d1f1f;color:#f85149}
+.b-armor{background:#1f3d1f;color:#3fb950}
+.b-consumable{background:#1f2d3d;color:#58a6ff}
+.b-material{background:#2d2d1f;color:#d29922}
+.b-quest{background:#2d1f3d;color:#a371f7}
+.b-enemy{background:#3d2418;color:#f0883e}
+.b-npc{background:#1f353d;color:#39d353}
+.b-other{background:#222;color:#888}
+/* ── edit form ── */
+.ed-form{flex:1;overflow-y:auto;padding:16px}
+.f-title{font-size:14px;font-weight:600;color:#f0b429;margin-bottom:14px}
+.f-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.f-full{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px}
+.field input,.field select,.field textarea{background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:5px;font:inherit;font-size:12px}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#58a6ff}
+.field textarea{resize:vertical;min-height:54px}
+.sec{font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid #30363d}
+.f-actions{display:flex;gap:8px;margin-top:14px}
+.btn{padding:5px 14px;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:6px;cursor:pointer;font:inherit;font-size:12px}
+.btn:hover{background:#30363d}
+.btn.primary{background:#1f6feb;border-color:#1f6feb}
+.btn.primary:hover{background:#388bfd}
+.empty{display:flex;align-items:center;justify-content:center;flex:1;color:#8b949e;font-size:12px}
+pre.data{font-size:11px;color:#8b949e;background:#0d1117;padding:8px;border-radius:5px;overflow:auto;max-height:160px;border:1px solid #21262d}
+/* ── world editor ── */
+#we-left{width:190px;flex-shrink:0;border-right:1px solid #30363d;display:flex;flex-direction:column;overflow:hidden}
+#we-controls{padding:8px;border-bottom:1px solid #30363d;flex-shrink:0;display:flex;flex-direction:column;gap:6px}
+#we-controls label{display:block;font-size:10px;color:#8b949e;margin-bottom:2px}
+#we-controls select,#we-controls .field select{width:100%;background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:4px 6px;border-radius:4px;font:inherit;font-size:12px}
+#we-btns{display:flex;gap:4px;flex-wrap:wrap}
+#we-palette{flex:1;overflow-y:auto;padding:3px}
+.we-pi{display:flex;align-items:center;gap:5px;padding:2px 5px;cursor:pointer;border-radius:3px;border:1px solid transparent}
+.we-pi:hover{background:#1c2128}
+.we-pi.sel{background:#1c2128;border-color:#58a6ff}
+.we-pi .spr{width:22px;height:22px;image-rendering:pixelated;flex-shrink:0}
+.we-pi span{font-size:10px;color:#c9d1d9}
+#we-wrap{flex:1;overflow:auto;background:#0a0a0a;cursor:crosshair;position:relative}
+#we-canvas{display:block;image-rendering:pixelated}
+#we-coords{position:fixed;bottom:6px;right:8px;background:rgba(0,0,0,0.75);color:#58a6ff;font-size:11px;font-family:monospace;padding:2px 8px;border-radius:4px;pointer-events:none;display:none}
+.we-mode-btn{flex:1;padding:4px 6px;font-size:11px}
+.we-mode-btn.active{background:#1f6feb;border-color:#1f6feb}
+#we-inspector .insp-sec{font-size:10px;color:#8b949e;text-transform:uppercase;margin:8px 0 4px;border-bottom:1px solid #30363d;padding-bottom:2px}
+#we-inspector .insp-row{display:flex;align-items:center;gap:4px;margin-bottom:4px}
+#we-inspector .insp-row label{color:#8b949e;font-size:10px;width:52px;flex-shrink:0}
+#we-inspector .insp-row input,#we-inspector .insp-row select{flex:1;background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:2px 5px;border-radius:3px;font:inherit;font-size:11px;min-width:0}
+#we-inspector .insp-item{padding:4px 6px;border-radius:3px;cursor:pointer;border:1px solid transparent;margin-bottom:2px}
+#we-inspector .insp-item:hover{background:#1c2128}
+#we-inspector .insp-item.sel{background:#1c2128;border-color:#58a6ff}
+#we-inspector .goto-btn{font-size:10px;padding:1px 6px;background:#1f3d5e;border:1px solid #1f6feb;color:#58a6ff;border-radius:3px;cursor:pointer;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <h1>⚔️ RPG Dev Tools</h1>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="tab('tilemap')">🗺️ Tile Mapper</button>
+    <button class="tab-btn" onclick="tab('items')">🗡️ Items</button>
+    <button class="tab-btn" onclick="tab('enemies')">👹 Enemies</button>
+    <button class="tab-btn" onclick="tab('npcs')">🧙 NPCs</button>
+    <button class="tab-btn" onclick="tab('shops')">🏪 Shops</button>
+    <button class="tab-btn" onclick="tab('loottables')">📋 Loot Tables</button>
+    <button class="tab-btn" onclick="tab('world')">🌍 World Editor</button>
+    <button class="tab-btn" onclick="tab('chars')">👥 Characters</button>
+  </div>
+  <div id="status"></div>
+</div>
+<div id="content">
+
+  <!-- ══ TILE MAPPER ══ -->
+  <div id="p-tilemap" class="panel active">
+    <div id="tm-list"></div>
+    <div id="tm-right">
+      <div id="tm-bar">
+        <span id="tm-hint">← Select a game tile, then click the sheet to assign it</span>
+        <button class="btn primary" onclick="saveTilemap()">💾 Save kenneyTileMap.js</button>
+      </div>
+      <div id="tm-wrap"><canvas id="tm-canvas"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ══ ITEMS ══ -->
+  <div id="p-items" class="panel">
+    <div class="ed-left">
+      <div class="ed-search">
+        <input id="i-search" placeholder="Search…" oninput="filterItems()">
+        <select id="i-type" onchange="filterItems()">
+          <option value="">All types</option>
+          <option>weapon</option><option>armor</option>
+          <option>consumable</option><option>material</option><option>quest</option>
+        </select>
+      </div>
+      <div class="ed-rows" id="i-rows"></div>
+    </div>
+    <div class="ed-form" id="i-form"><div class="empty">Select an item to edit</div></div>
+  </div>
+
+  <!-- ══ ENEMIES ══ -->
+  <div id="p-enemies" class="panel">
+    <div class="ed-left">
+      <div class="ed-search">
+        <input id="e-search" placeholder="Search…" oninput="filterEnemies()">
+      </div>
+      <div class="ed-rows" id="e-rows"></div>
+    </div>
+    <div class="ed-form" id="e-form"><div class="empty">Select an enemy to edit</div></div>
+  </div>
+
+  <!-- ══ NPCs ══ -->
+  <div id="p-npcs" class="panel">
+    <div class="ed-left">
+      <div class="ed-search">
+        <input id="n-search" placeholder="Search…" oninput="filterNpcs()">
+      </div>
+      <div class="ed-rows" id="n-rows"></div>
+    </div>
+    <div class="ed-form" id="n-form"><div class="empty">Select an NPC to edit</div></div>
+  </div>
+
+  <!-- ══ SHOPS ══ -->
+  <div id="p-shops" class="panel">
+    <div class="ed-left">
+      <div class="ed-search" style="justify-content:space-between">
+        <span style="font-size:12px;color:#8b949e;padding:4px 6px">Shops</span>
+        <button class="btn" style="font-size:11px;padding:3px 8px" onclick="shAddShop()">+ New</button>
+      </div>
+      <div class="ed-rows" id="sh-rows"></div>
+    </div>
+    <div class="ed-form" id="sh-form"><div class="empty">Select a shop to edit</div></div>
+  </div>
+
+  <!-- ══ LOOT TABLES ══ -->
+  <div id="p-loottables" class="panel">
+    <div class="ed-left">
+      <div class="ed-search" style="justify-content:space-between">
+        <span style="font-size:12px;color:#8b949e;padding:4px 6px">Loot Tables</span>
+        <button class="btn" style="font-size:11px;padding:3px 8px" onclick="ltAddTable()">+ New</button>
+      </div>
+      <div id="lt-list"></div>
+    </div>
+    <div class="ed-form" id="lt-form"><div class="empty">Select a loot table to edit</div></div>
+  </div>
+
+  <!-- ══ WORLD EDITOR ══ -->
+  <div id="p-world" class="panel">
+    <div id="we-left">
+      <div id="we-controls">
+        <div>
+          <label>Zone</label>
+          <select id="we-zone" onchange="weLoadZone();this.blur()"><option value="">— select zone —</option></select>
+        </div>
+        <div id="we-mode-row" style="display:flex;gap:4px">
+          <button class="btn we-mode-btn active" onclick="weSetMode('tiles')" data-mode="tiles" title="Paint tiles">Tiles</button>
+          <button class="btn we-mode-btn" onclick="weSetMode('overlays')" data-mode="overlays" title="Move NPCs, transitions, spawns">Overlay</button>
+        </div>
+        <!-- tiles mode controls -->
+        <div id="we-tiles-ctrl">
+          <label>Layer</label>
+          <select id="we-layer" onchange="weCurLayer=this.value;this.blur();weDrawZone()">
+            <option value="ground">ground</option>
+            <option value="objects">objects</option>
+            <option value="roof">roof</option>
+          </select>
+        </div>
+        <!-- overlay mode controls -->
+        <div id="we-ov-ctrl" style="display:none;font-size:10px;color:#8b949e;line-height:1.6">
+          Drag NPCs · transitions<br>to reposition.<br>
+          Click transition → edit dest.
+        </div>
+        <div id="we-btns">
+          <button class="btn" onclick="weZoom=Math.max(1,weZoom-1);weDrawZone()" title="Zoom out">−</button>
+          <span id="we-zl" style="align-self:center;font-size:11px;color:#8b949e;min-width:18px">2×</span>
+          <button class="btn" onclick="weZoom=Math.min(4,weZoom+1);weDrawZone()" title="Zoom in">+</button>
+          <button class="btn" id="we-grid-btn" onclick="weGrid=!weGrid;this.style.color=weGrid?'#58a6ff':'';weDrawZone()">Grid</button>
+          <button class="btn primary" onclick="weSaveZone()">Save</button>
+          <button class="btn" onclick="weResetZone()" title="Reload zone from disk, discarding unsaved changes" style="color:#f0883e">↺ Reset</button>
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn" style="font-size:10px;padding:3px 7px;flex:1" onclick="weOpenAddZone()" title="Create new zone">+ Zone</button>
+          <button class="btn" style="font-size:10px;padding:3px 7px;flex:1" onclick="weOpenCopyZone()" title="Copy current zone">Copy</button>
+          <button class="btn" style="font-size:10px;padding:3px 7px;flex:1" onclick="weOpenRenameZone()" title="Rename or resize current zone">Rename</button>
+        </div>
+        <div id="we-hint" style="font-size:10px;color:#8b949e">LClick paint · RClick erase · MMB pan</div>
+      </div>
+      <!-- tile palette (tiles mode) / overlay inspector (overlay mode) -->
+      <div id="we-palette"></div>
+      <div id="we-inspector" style="display:none;flex:1;overflow-y:auto;padding:6px;font-size:11px"></div>
+    </div>
+    <div id="we-wrap">
+      <canvas id="we-canvas"></canvas>
+    </div>
+    <div id="we-coords"></div>
+  </div>
+
+  <!-- ══ CHARACTERS ══ -->
+  <div id="p-chars" class="panel" style="flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;padding:10px 14px;border-bottom:1px solid #30363d;background:#161b22">
+      <input id="chars-search" placeholder="Search name…" oninput="charsFilter()" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 10px;border-radius:4px;font:inherit;font-size:12px;flex:1">
+      <button class="btn" onclick="charsLoad()">↺ Refresh</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:14px">
+      <table id="chars-table" style="border-collapse:collapse;width:100%;font-size:12px">
+        <thead>
+          <tr style="border-bottom:1px solid #30363d;color:#8b949e;font-size:11px;text-align:left">
+            <th style="padding:6px 8px;cursor:pointer;user-select:none" onclick="charsSort('name')">Name</th>
+            <th style="padding:6px 8px;cursor:pointer;user-select:none" onclick="charsSort('level')">Lv</th>
+            <th style="padding:6px 8px;cursor:pointer;user-select:none" onclick="charsSort('lastZone')">Zone</th>
+            <th style="padding:6px 8px;cursor:pointer;user-select:none" onclick="charsSort('gold')">Gold</th>
+            <th style="padding:6px 8px;cursor:pointer;user-select:none" onclick="charsSort('lastSeen')">Last Seen</th>
+            <th style="padding:6px 8px;cursor:pointer;user-select:none" onclick="charsSort('createdAt')">Created</th>
+            <th style="padding:6px 8px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="chars-body"></tbody>
+      </table>
+      <div id="chars-empty" style="color:#8b949e;font-size:12px;display:none;padding:20px 0">No characters found.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Add-NPC modal -->
+<div id="we-add-npc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px;min-width:260px;display:flex;flex-direction:column;gap:10px">
+    <div style="color:#e6edf3;font-size:13px;font-weight:600">Place NPC — NPC ID</div>
+    <input id="we-add-npc-input" list="dev-npc-ids" placeholder="e.g. captain_aldric" style="width:100%;box-sizing:border-box"
+      onkeydown="if(event.key==='Enter')weConfirmAddNpc();if(event.key==='Escape')weAddNpcCancel()">
+    <div style="display:flex;gap:6px">
+      <button class="btn primary" style="flex:1" onclick="weConfirmAddNpc()">Confirm</button>
+      <button class="btn" style="flex:1" onclick="weAddNpcCancel()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Char Rename modal -->
+<div id="char-rename-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px;min-width:280px;display:flex;flex-direction:column;gap:10px">
+    <div style="color:#e6edf3;font-size:13px;font-weight:600">Rename Character</div>
+    <div id="char-rename-from" style="color:#8b949e;font-size:12px"></div>
+    <input id="char-rename-input" placeholder="New name (3–20 chars, a-z 0-9 _)" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 10px;border-radius:4px;font:inherit;font-size:12px;width:100%"
+      onkeydown="if(event.key==='Enter')charRenameConfirm();if(event.key==='Escape')charModalClose('char-rename-modal')">
+    <div style="display:flex;gap:6px">
+      <button class="btn primary" style="flex:1" onclick="charRenameConfirm()">Rename</button>
+      <button class="btn" style="flex:1" onclick="charModalClose('char-rename-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Char Change PIN modal -->
+<div id="char-pin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px;min-width:280px;display:flex;flex-direction:column;gap:10px">
+    <div style="color:#e6edf3;font-size:13px;font-weight:600">Change PIN</div>
+    <div id="char-pin-target" style="color:#8b949e;font-size:12px"></div>
+    <input id="char-pin-input" type="password" placeholder="New PIN (min 4 chars)" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 10px;border-radius:4px;font:inherit;font-size:12px;width:100%"
+      onkeydown="if(event.key==='Enter')charPinConfirm();if(event.key==='Escape')charModalClose('char-pin-modal')">
+    <div style="display:flex;gap:6px">
+      <button class="btn primary" style="flex:1" onclick="charPinConfirm()">Set PIN</button>
+      <button class="btn" style="flex:1" onclick="charModalClose('char-pin-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Char Copy modal -->
+<div id="char-copy-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px;min-width:280px;display:flex;flex-direction:column;gap:10px">
+    <div style="color:#e6edf3;font-size:13px;font-weight:600">Copy Character</div>
+    <div id="char-copy-from" style="color:#8b949e;font-size:12px"></div>
+    <input id="char-copy-name" placeholder="New character name" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 10px;border-radius:4px;font:inherit;font-size:12px;width:100%"
+      onkeydown="if(event.key==='Escape')charModalClose('char-copy-modal')">
+    <input id="char-copy-pin" type="password" placeholder="PIN for new character" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 10px;border-radius:4px;font:inherit;font-size:12px;width:100%"
+      onkeydown="if(event.key==='Enter')charCopyConfirm();if(event.key==='Escape')charModalClose('char-copy-modal')">
+    <div style="display:flex;gap:6px">
+      <button class="btn primary" style="flex:1" onclick="charCopyConfirm()">Copy</button>
+      <button class="btn" style="flex:1" onclick="charModalClose('char-copy-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sprite Builder Modal -->
+<div id="sb-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9100;align-items:flex-start;justify-content:center;padding-top:16px;overflow:auto">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;display:flex;gap:16px">
+
+    <!-- Left: Preview + layers + actions -->
+    <div style="display:flex;flex-direction:column;gap:8px;min-width:170px;max-width:170px">
+      <div style="color:#e6edf3;font-size:13px;font-weight:600">Sprite Builder</div>
+      <div style="background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:8px;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div style="font-size:10px;color:#8b949e;letter-spacing:.5px">PREVIEW</div>
+        <canvas id="sb-preview" width="64" height="64" style="image-rendering:pixelated;border:1px solid #21262d"></canvas>
+      </div>
+      <div style="font-size:10px;color:#8b949e;letter-spacing:.5px">LAYERS (bottom → top)</div>
+      <div id="sb-layers" style="display:flex;flex-direction:column;gap:3px;min-height:30px"></div>
+      <div style="font-size:10px;color:#555;margin-top:2px">Right-click a tile to remove a layer</div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn primary" style="flex:1" onclick="sbConfirm()">✓ Apply</button>
+        <button class="btn" onclick="sbClose()">Cancel</button>
+      </div>
+      <button class="btn" style="background:#8b0000;font-size:11px" onclick="sbClear()">✕ Clear Sprite</button>
+    </div>
+
+    <!-- Right: Sheet browser -->
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button id="sb-btn-base"  class="btn primary" style="font-size:11px;padding:3px 10px" onclick="sbSetMode('base')">🧍 Set Base</button>
+        <button id="sb-btn-layer" class="btn"         style="font-size:11px;padding:3px 10px" onclick="sbSetMode('layer')">➕ Add Layer</button>
+        <span id="sb-hover" style="font-size:11px;color:#8b949e"></span>
+      </div>
+      <div style="font-size:10px;color:#8b949e">Cols 0–1: unequipped base · Cols 2+: equipped variants &amp; gear pieces</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="font-size:11px;color:#8b949e">Zoom</label>
+        <input type="range" id="sb-zoom" min="1" max="6" value="3" style="width:100px" oninput="sbDrawSheet()">
+      </div>
+      <div style="overflow:auto;max-height:72vh;max-width:80vw">
+        <canvas id="sb-canvas" style="cursor:crosshair;image-rendering:pixelated;display:block"></canvas>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Add-transition modal -->
+<div id="we-add-trans-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px;min-width:300px;display:flex;flex-direction:column;gap:10px">
+    <div style="color:#e6edf3;font-size:13px;font-weight:600">New Transition</div>
+    <div style="font-size:11px;color:#8b949e">After confirming, click-drag on the map to draw the trigger rect.</div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <label style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px">Destination Zone</label>
+      <input id="we-add-trans-zone" list="dev-zone-ids" placeholder="e.g. millhaven"
+        style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 10px;border-radius:4px;font:inherit;font-size:12px;width:100%"
+        onkeydown="if(event.key==='Tab'){event.preventDefault();document.getElementById('we-add-trans-id').focus()}if(event.key==='Escape')weAddTransCancel()">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <label style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px">Transition ID</label>
+      <input id="we-add-trans-id" placeholder="e.g. exit_north (auto-generated if blank)"
+        style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 10px;border-radius:4px;font:inherit;font-size:12px;width:100%"
+        onkeydown="if(event.key==='Enter')weConfirmAddTrans();if(event.key==='Escape')weAddTransCancel()">
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="btn primary" style="flex:1" onclick="weConfirmAddTrans()">Draw on Map →</button>
+      <button class="btn" style="flex:1" onclick="weAddTransCancel()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add-spawn modal (searchable enemy ID) -->
+<div id="we-add-spawn-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px;min-width:260px;display:flex;flex-direction:column;gap:10px">
+    <div style="color:#e6edf3;font-size:13px;font-weight:600">New Spawn — Enemy ID</div>
+    <input id="we-add-spawn-input" list="dev-enemy-ids" placeholder="e.g. goblin" style="width:100%;box-sizing:border-box"
+      onkeydown="if(event.key==='Enter')weConfirmAddSpawn();if(event.key==='Escape')document.getElementById('we-add-spawn-modal').style.display='none'">
+    <div style="display:flex;gap:6px">
+      <button class="btn primary" style="flex:1" onclick="weConfirmAddSpawn()">Confirm</button>
+      <button class="btn" style="flex:1" onclick="document.getElementById('we-add-spawn-modal').style.display='none'">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Item Picker modal -->
+<div id="item-picker-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9500;align-items:center;justify-content:center" onclick="if(event.target===this)itemPickerClose()">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;width:480px;max-width:95vw;display:flex;flex-direction:column;gap:10px;max-height:85vh">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="color:#e6edf3;font-size:13px;font-weight:600;flex:1">Pick Item</span>
+      <span id="item-picker-mode-label" style="font-size:11px;color:#8b949e"></span>
+      <button class="btn" style="padding:2px 8px;font-size:12px" onclick="itemPickerClose()">✕</button>
+    </div>
+    <input id="item-picker-search" type="text" placeholder="Search by name, ID, type…"
+      style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:6px 10px;border-radius:4px;font:inherit;font-size:12px"
+      oninput="itemPickerFilter()" onkeydown="itemPickerKey(event)">
+    <div id="item-picker-list" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:2px;min-height:0;max-height:55vh"></div>
+    <div style="font-size:10px;color:#484f58">↑↓ navigate · Enter select · Esc cancel</div>
+  </div>
+</div>
+
+<!-- Add Zone modal -->
+<div id="we-add-zone-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px;min-width:320px;display:flex;flex-direction:column;gap:10px">
+    <div style="color:#e6edf3;font-size:13px;font-weight:600">New Zone</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:10px;color:#8b949e;text-transform:uppercase">Zone ID (slug)</label>
+        <input id="waz-id" placeholder="e.g. dark_forest" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:4px;font:inherit;font-size:12px" onkeydown="if(event.key==='Escape')weZoneModalClose('we-add-zone-modal')">
+      </div>
+      <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:10px;color:#8b949e;text-transform:uppercase">Display Name</label>
+        <input id="waz-name" placeholder="e.g. Dark Forest" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:4px;font:inherit;font-size:12px" onkeydown="if(event.key==='Enter')weConfirmAddZone();if(event.key==='Escape')weZoneModalClose('we-add-zone-modal')">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:10px;color:#8b949e;text-transform:uppercase">Width (tiles)</label>
+        <input id="waz-w" type="number" value="30" min="4" max="200" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:4px;font:inherit;font-size:12px">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:10px;color:#8b949e;text-transform:uppercase">Height (tiles)</label>
+        <input id="waz-h" type="number" value="30" min="4" max="200" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:4px;font:inherit;font-size:12px" onkeydown="if(event.key==='Enter')weConfirmAddZone()">
+      </div>
+    </div>
+    <div id="waz-err" style="color:#f85149;font-size:11px;display:none"></div>
+    <div style="display:flex;gap:6px">
+      <button class="btn primary" style="flex:1" onclick="weConfirmAddZone()">Create</button>
+      <button class="btn" style="flex:1" onclick="weZoneModalClose('we-add-zone-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Copy Zone modal -->
+<div id="we-copy-zone-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px;min-width:320px;display:flex;flex-direction:column;gap:10px">
+    <div style="color:#e6edf3;font-size:13px;font-weight:600">Copy Zone — <span id="wcz-src-label" style="color:#8b949e"></span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:10px;color:#8b949e;text-transform:uppercase">New Zone ID</label>
+        <input id="wcz-id" placeholder="e.g. dark_forest_2" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:4px;font:inherit;font-size:12px">
+      </div>
+      <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:10px;color:#8b949e;text-transform:uppercase">Display Name</label>
+        <input id="wcz-name" placeholder="e.g. Dark Forest 2" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:4px;font:inherit;font-size:12px" onkeydown="if(event.key==='Enter')weConfirmCopyZone()">
+      </div>
+    </div>
+    <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Include from source</div>
+    <div style="display:flex;flex-direction:column;gap:5px;font-size:12px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="wcz-layers" checked> Tile layers</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="wcz-sp" checked> Spawn point</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="wcz-spawns" checked> Enemy spawns</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="wcz-trans"> Transitions</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="wcz-npcs"> NPC placements</label>
+    </div>
+    <div id="wcz-err" style="color:#f85149;font-size:11px;display:none"></div>
+    <div style="display:flex;gap:6px">
+      <button class="btn primary" style="flex:1" onclick="weConfirmCopyZone()">Copy</button>
+      <button class="btn" style="flex:1" onclick="weZoneModalClose('we-copy-zone-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rename/Resize Zone modal -->
+<div id="we-rename-zone-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px;min-width:340px;display:flex;flex-direction:column;gap:10px">
+    <div style="color:#e6edf3;font-size:13px;font-weight:600">Rename / Resize Zone</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:10px;color:#8b949e;text-transform:uppercase">New Zone ID <span style="color:#8b949e;font-weight:400">(leave blank to keep)</span></label>
+        <input id="wrz-id" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:4px;font:inherit;font-size:12px" onkeydown="if(event.key==='Escape')weZoneModalClose('we-rename-zone-modal')">
+      </div>
+      <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:10px;color:#8b949e;text-transform:uppercase">Display Name <span style="color:#8b949e;font-weight:400">(leave blank to keep)</span></label>
+        <input id="wrz-name" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:4px;font:inherit;font-size:12px">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:10px;color:#8b949e;text-transform:uppercase">Width (tiles) <span id="wrz-cur-w" style="color:#444"></span></label>
+        <input id="wrz-w" type="number" min="4" max="200" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:4px;font:inherit;font-size:12px">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:10px;color:#8b949e;text-transform:uppercase">Height (tiles) <span id="wrz-cur-h" style="color:#444"></span></label>
+        <input id="wrz-h" type="number" min="4" max="200" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:4px;font:inherit;font-size:12px" onkeydown="if(event.key==='Enter')weConfirmRenameZone()">
+      </div>
+    </div>
+    <div style="font-size:10px;color:#8b949e">Resize extends/contracts from the top-left corner. ID rename updates all transition links across all zones.</div>
+    <div id="wrz-err" style="color:#f85149;font-size:11px;display:none"></div>
+    <div style="display:flex;gap:6px">
+      <button class="btn primary" style="flex:1" onclick="weConfirmRenameZone()">Apply</button>
+      <button class="btn" style="flex:1" onclick="weZoneModalClose('we-rename-zone-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ────────────────────────────────────────────────────────
+// STATE
+// ────────────────────────────────────────────────────────
+let tileMap = {}, sheetCols = 57, sheetImg = null, selTile = null;
+let itemDb = {}, enemyDb = {}, npcDb = {};
+const STRIDE = 17, TS = 16, ZOOM = 2, DS = TS * ZOOM; // display tile size = 32
+
+// World editor state
+let weZoneData = null, weCurLayer = 'ground', wePaintTile = 1, weZoom = 2, weGrid = true, wePainting = false;
+// Tile copy/paste state
+let _weCopyDrawing = null;  // { tx0, ty0, tx1, ty1 } during selection drag (tile coords)
+let _weClipboard   = null;  // { w, h, layers: { layerName: [...] } }
+let _wePasting     = false; // paste mode active
+let _wePasteTx     = 0, _wePasteTy = 0; // paste preview position (tile coords)
+
+const TILE_COLORS = {
+  1:'#4a7c3f',2:'#8b6340',3:'#888',4:'#a0723a',5:'#3a7dc9',6:'#d4b483',
+  7:'#4a5e30',8:'#555',9:'#b09060',10:'#666',11:'#6b4a1e',12:'#2d5a1b',
+  13:'#2d5a1b',14:'#3a6e25',15:'#a08040',16:'#7a5020',17:'#7a5020',
+  18:'#c8a020',19:'#888',20:'#604010',21:'#555',22:'#555',23:'#888',
+  24:'#888',25:'#888',26:'#1a5aaa',27:'#604010',28:'#8b6040',
+  29:'#a0723a',30:'#c8a0a0',40:'#c8a040',41:'#7a7a8a'
+};
+
+const GAME_TILES = [
+  {id:1,name:'GRASS',cat:'terrain'},{id:2,name:'DIRT',cat:'terrain'},
+  {id:3,name:'STONE_FLOOR',cat:'terrain'},{id:4,name:'WOOD_FLOOR',cat:'terrain'},
+  {id:5,name:'WATER',cat:'terrain'},{id:6,name:'SAND',cat:'terrain'},
+  {id:7,name:'SWAMP',cat:'terrain'},{id:8,name:'DUNGEON_FLOOR',cat:'terrain'},
+  {id:9,name:'PATH',cat:'terrain'},{id:10,name:'WALL_STONE',cat:'wall'},
+  {id:11,name:'WALL_WOOD',cat:'wall'},{id:12,name:'TREE',cat:'prop'},
+  {id:13,name:'TREE_TOP',cat:'prop'},{id:14,name:'BUSH',cat:'prop'},
+  {id:15,name:'FENCE',cat:'prop'},{id:16,name:'DOOR_CLOSED',cat:'door'},
+  {id:17,name:'DOOR_OPEN',cat:'door'},{id:18,name:'CHEST',cat:'prop'},
+  {id:19,name:'SIGN',cat:'prop'},{id:20,name:'TORCH',cat:'prop'},
+  {id:21,name:'STAIRS_DOWN',cat:'special'},{id:22,name:'STAIRS_UP',cat:'special'},
+  {id:23,name:'PRESSURE_PLATE',cat:'special'},{id:24,name:'GATE_CLOSED',cat:'door'},
+  {id:25,name:'GATE_OPEN',cat:'door'},{id:26,name:'WATER_DEEP',cat:'terrain'},
+  {id:27,name:'CAMPFIRE',cat:'prop'},{id:28,name:'BARREL',cat:'prop'},
+  {id:29,name:'TABLE',cat:'prop'},{id:30,name:'BED',cat:'prop'},
+  {id:40,name:'ROOF_THATCH',cat:'roof'},{id:41,name:'ROOF_STONE',cat:'roof'},
+];
+
+const CAT_CLR = {terrain:'#1a3d1a',wall:'#3d1a1a',prop:'#3d3a1a',door:'#1a2a3d',special:'#2a1a3d',roof:'#2a2a2a'};
+
+// ────────────────────────────────────────────────────────
+// INIT
+// ────────────────────────────────────────────────────────
+async function init() {
+  sheetImg = await loadImg('/assets/tilesets/roguelikeSheet_transparent.png');
+  await Promise.all([loadTilemap(), loadItems(), loadEnemies(), loadNpcs(), loadShops(), loadLootTables(), loadCharSheet(), weLoadZoneList()]);
+  buildDataLists();
+  buildTileList();
+  drawSheet();
+  buildItemRows(Object.values(itemDb));
+  buildEnemyRows(Object.values(enemyDb));
+  buildNpcRows(Object.values(npcDb));
+  buildShopRows();
+  buildLtRows();
+  weBuildPalette();
+}
+
+function loadImg(src) {
+  return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
+}
+
+async function api(path, method='GET', body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch('/dev/api/' + path, opts);
+  return r.json();
+}
+
+async function loadTilemap() {
+  const d = await api('tilemap');
+  tileMap = {};
+  for (const [k,v] of Object.entries(d.map||{})) tileMap[+k] = v;
+  sheetCols = d.cols || 57;
+}
+async function loadItems()   { try { itemDb  = await api('items');   } catch{} }
+async function loadEnemies() { try { enemyDb = await api('enemies'); } catch{} }
+async function loadNpcs()    { try { npcDb   = await api('npcs');    } catch{} }
+async function loadShops()   { try { shopDb  = await api('shops');   } catch{} }
+
+let _editDropTable = []; // editable drop table for current enemy
+let _editLootTableIds = []; // editable loot table IDs for current enemy
+
+function buildDataLists() {
+  // Populate <datalist> elements for enemy and item ID autocomplete
+  let el = document.getElementById('dev-enemy-ids');
+  if (!el) { el = document.createElement('datalist'); el.id = 'dev-enemy-ids'; document.body.appendChild(el); }
+  el.innerHTML = Object.keys(enemyDb).map(id => `<option value="${id}">`).join('');
+
+  let il = document.getElementById('dev-item-ids');
+  if (!il) { il = document.createElement('datalist'); il.id = 'dev-item-ids'; document.body.appendChild(il); }
+  il.innerHTML = Object.keys(itemDb).map(id => `<option value="${id}">`).join('');
+
+  let nl = document.getElementById('dev-npc-ids');
+  if (!nl) { nl = document.createElement('datalist'); nl.id = 'dev-npc-ids'; document.body.appendChild(nl); }
+  nl.innerHTML = Object.keys(npcDb).map(id => `<option value="${id}">`).join('');
+}
+
+function wePopulateZoneDatalist(zoneIds) {
+  let zl = document.getElementById('dev-zone-ids');
+  if (!zl) { zl = document.createElement('datalist'); zl.id = 'dev-zone-ids'; document.body.appendChild(zl); }
+  zl.innerHTML = zoneIds.map(id => `<option value="${id}">`).join('');
+}
+
+function buildLtChips() {
+  const el = document.getElementById('ef-lt-chips');
+  if (!el) return;
+  el.innerHTML = _editLootTableIds.map((id, i) =>
+    `<span style="background:#21262d;border:1px solid #30363d;border-radius:12px;padding:2px 8px;font-size:11px;display:inline-flex;align-items:center;gap:4px">
+      ${lootTableDb[id]?.name ?? id}
+      <button onclick="_editLootTableIds.splice(${i},1);buildLtChips()" style="background:none;border:none;color:#8b949e;cursor:pointer;padding:0;font-size:12px;line-height:1">✕</button>
+    </span>`
+  ).join('');
+}
+
+function efAddLootTable() {
+  const sel = document.getElementById('ef-lt-add');
+  const id = sel?.value;
+  if (!id || _editLootTableIds.includes(id)) return;
+  _editLootTableIds.push(id);
+  sel.value = '';
+  buildLtChips();
+}
+
+function buildDropRows() {
+  const el = document.getElementById('ef-drops');
+  if (!el) return;
+  el.innerHTML = _editDropTable.map((d, i) => `
+    <div style="display:flex;gap:4px;margin-bottom:3px;align-items:center">
+      <input list="dev-item-ids" value="${d.itemId||''}" placeholder="item id" style="flex:2;min-width:0" oninput="_editDropTable[${i}].itemId=this.value">
+      <input type="number" value="${Math.round((d.chance??0.1)*100)}" min="0" max="100" step="1" style="width:48px" title="Chance %" oninput="_editDropTable[${i}].chance=+this.value/100">
+      <span style="color:#8b949e;font-size:10px">%</span>
+      <input type="number" value="${d.qty||1}" min="1" style="width:38px" title="Qty" oninput="_editDropTable[${i}].qty=+this.value">
+      <button onclick="_editDropTable.splice(${i},1);buildDropRows()" style="background:#8b0000;border:none;color:#fff;padding:2px 5px;border-radius:3px;cursor:pointer;flex-shrink:0">✕</button>
+    </div>`).join('');
+}
+
+function eAddDrop() {
+  _editDropTable.push({ itemId: '', chance: 0.1, qty: 1 });
+  buildDropRows();
+}
+
+// ────────────────────────────────────────────────────────
+// TAB SWITCH
+// ────────────────────────────────────────────────────────
+function tab(id) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) =>
+    b.classList.toggle('active', ['tilemap','items','enemies','npcs','shops','loottables','world','chars'][i]===id));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('p-'+id).classList.add('active');
+  if (id === 'world') { weBuildPalette(); weDrawZone(); }
+  if (id === 'chars') { charsLoad(); }
+}
+
+// ────────────────────────────────────────────────────────
+// TILE MAPPER
+// ────────────────────────────────────────────────────────
+function sprStyle(idx, size=32) {
+  if (idx == null) return 'background:#1a1a1a';
+  const col = idx % sheetCols, row = Math.floor(idx / sheetCols);
+  const sc = size / TS;
+  return `background:url('/assets/tilesets/roguelikeSheet_transparent.png') `
+    + `-${col*STRIDE*sc}px -${row*STRIDE*sc}px / ${968*sc}px ${526*sc}px;image-rendering:pixelated`;
+}
+
+function buildTileList() {
+  document.getElementById('tm-list').innerHTML = GAME_TILES.map(t =>
+    `<div class="tm-item${selTile===t.id?' sel':''}" onclick="selectTile(${t.id})">
+      <div class="tm-spr" style="${sprStyle(tileMap[t.id])}"></div>
+      <div class="tm-nm">${t.name}<br><span class="tm-id">#${t.id}</span></div>
+      <div class="cat-badge" style="background:${CAT_CLR[t.cat]||'#222'}">${t.cat}</div>
+    </div>`
+  ).join('');
+}
+
+function selectTile(id) {
+  selTile = id;
+  buildTileList();
+  drawSheet();
+  const gt = GAME_TILES.find(t=>t.id===id);
+  const idx = tileMap[id];
+  document.getElementById('tm-hint').textContent =
+    `Selected: ${gt?.name}  (currently → index ${idx ?? 'none'})  •  Click sheet to assign`;
+}
+
+function drawSheet() {
+  const canvas = document.getElementById('tm-canvas');
+  if (!sheetImg) return;
+  const W = sheetImg.naturalWidth, H = sheetImg.naturalHeight;
+  canvas.width = W * ZOOM; canvas.height = H * ZOOM;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(sheetImg, 0, 0, W*ZOOM, H*ZOOM);
+
+  // Grid
+  const COLS = Math.ceil(W / STRIDE), ROWS = Math.ceil(H / STRIDE);
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = .5;
+  for (let c=0;c<=COLS;c++){ctx.beginPath();ctx.moveTo(c*STRIDE*ZOOM,0);ctx.lineTo(c*STRIDE*ZOOM,H*ZOOM);ctx.stroke()}
+  for (let r=0;r<=ROWS;r++){ctx.beginPath();ctx.moveTo(0,r*STRIDE*ZOOM);ctx.lineTo(W*ZOOM,r*STRIDE*ZOOM);ctx.stroke()}
+
+  // Dim-blue highlight all mapped tiles
+  ctx.fillStyle = 'rgba(88,166,255,0.12)';
+  for (const idx of Object.values(tileMap)) {
+    const c=idx%sheetCols, r=Math.floor(idx/sheetCols);
+    ctx.fillRect(c*STRIDE*ZOOM, r*STRIDE*ZOOM, DS, DS);
+  }
+  // Yellow border: currently selected tile's mapping
+  if (selTile != null && tileMap[selTile] != null) {
+    const idx=tileMap[selTile], c=idx%sheetCols, r=Math.floor(idx/sheetCols);
+    ctx.strokeStyle='#f0b429'; ctx.lineWidth=2;
+    ctx.strokeRect(c*STRIDE*ZOOM+1, r*STRIDE*ZOOM+1, DS-2, DS-2);
+  }
+  // Row/col labels every 5
+  ctx.font = '8px monospace'; ctx.fillStyle = 'rgba(136,200,255,0.55)';
+  for (let c=0;c<COLS;c+=5) ctx.fillText(`c${c}`, c*STRIDE*ZOOM+2, 8);
+  for (let r=0;r<ROWS;r+=5) ctx.fillText(`r${r}`, 2, r*STRIDE*ZOOM+10);
+}
+
+document.getElementById('tm-canvas').addEventListener('click', e => {
+  if (selTile == null) { status('Select a tile on the left first', 'err'); return; }
+  const col = Math.floor(e.offsetX / (STRIDE*ZOOM));
+  const row = Math.floor(e.offsetY / (STRIDE*ZOOM));
+  const idx = row * sheetCols + col;
+  tileMap[selTile] = idx;
+  buildTileList(); drawSheet();
+  const nm = GAME_TILES.find(t=>t.id===selTile)?.name;
+  status(`Assigned ${nm} → row ${row}, col ${col} (idx ${idx})`, 'ok');
+  document.getElementById('tm-hint').textContent =
+    `Assigned: ${nm} → row ${row}, col ${col}  •  Select another tile or save`;
+});
+
+document.getElementById('tm-canvas').addEventListener('mousemove', e => {
+  const col = Math.floor(e.offsetX / (STRIDE*ZOOM));
+  const row = Math.floor(e.offsetY / (STRIDE*ZOOM));
+  const idx = row * sheetCols + col;
+  const mapped = Object.entries(tileMap).find(([,v])=>v===idx);
+  const label = mapped ? ` ← ${GAME_TILES.find(t=>t.id===+mapped[0])?.name||mapped[0]}` : '';
+  if (selTile==null)
+    document.getElementById('tm-hint').textContent = `row ${row}, col ${col}  →  index ${idx}${label}`;
+});
+
+async function saveTilemap() {
+  const d = await api('tilemap', 'POST', { map: tileMap });
+  d.ok ? status('✓ kenneyTileMap.js saved! Refresh game to see changes.', 'ok')
+       : status('Save failed: ' + d.error, 'err');
+}
+
+// ────────────────────────────────────────────────────────
+// ITEM EDITOR
+// ────────────────────────────────────────────────────────
+function filterItems() {
+  const q = document.getElementById('i-search').value.toLowerCase();
+  const t = document.getElementById('i-type').value;
+  buildItemRows(Object.values(itemDb).filter(it =>
+    (!q || it.name?.toLowerCase().includes(q) || it.id?.includes(q)) && (!t || it.type===t)));
+}
+
+function buildItemRows(items) {
+  document.getElementById('i-rows').innerHTML = items.length
+    ? items.map(it => `<div class="ed-row" data-id="${it.id}" onclick="editItem('${it.id}')">
+        <div class="ed-rid">${it.id}</div>
+        <div class="ed-rname">${it.name}</div>
+        <span class="badge b-${it.type||'other'}">${it.type}</span>
+      </div>`).join('')
+    : '<div class="empty">No items</div>';
+}
+
+function editItem(id) {
+  document.querySelectorAll('#i-rows .ed-row').forEach(r => r.classList.toggle('sel', r.dataset.id===id));
+  const it = itemDb[id]; if (!it) return;
+  const st = it.stats||{}, ef = it.effect||{};
+  document.getElementById('i-form').innerHTML = `
+    <div class="f-title">${it.name} <span style="color:#8b949e;font-weight:400;font-size:11px">(${id})</span></div>
+    <div class="f-grid">
+      <div class="field"><label>Name</label><input id="if-name" value="${esc(it.name)}"></div>
+      <div class="field"><label>Type</label>
+        <select id="if-type">${['weapon','armor','consumable','material','quest'].map(t=>`<option${it.type===t?' selected':''}>${t}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>Subtype</label><input id="if-sub" value="${esc(it.subtype||'')}"></div>
+      <div class="field"><label>Slot</label><input id="if-slot" value="${esc(it.slot||'')}"></div>
+      <div class="field"><label>Gold Value</label><input id="if-val" type="number" value="${it.value||0}"></div>
+      <div class="field"><label>Icon</label><input id="if-icon" value="${esc(it.icon||'')}"></div>
+      <div class="field f-full"><label>Description</label><textarea id="if-desc">${esc(it.description||'')}</textarea></div>
+    </div>
+    <div class="sec">Stats</div>
+    <div class="f-grid">
+      ${['ATK','DEF','STR','DEX','INT','CON','WIS','CHA','SPD'].map(s=>
+        `<div class="field"><label>${s}</label><input id="if-s-${s}" type="number" value="${st[s]??''}"></div>`).join('')}
+    </div>
+    <div class="sec">Effect (consumable)</div>
+    <div class="f-grid">
+      <div class="field"><label>Type</label>
+        <select id="if-et">${['','heal','mp_restore'].map(t=>`<option value="${t}"${ef.type===t?' selected':''}>${t||'none'}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>Amount</label><input id="if-ea" type="number" value="${ef.amount||0}"></div>
+    </div>
+    <div class="f-actions">
+      <button class="btn primary" onclick="saveItem('${id}')">💾 Save Item</button>
+      <button class="btn" onclick="duplicateItem('${id}')">⧉ Duplicate</button>
+    </div>`;
+}
+
+async function saveItem(id) {
+  const it = {...itemDb[id]};
+  it.name = v('if-name'); it.type = v('if-type'); it.subtype = v('if-sub')||null;
+  it.slot = v('if-slot')||null; it.value = +v('if-val')||0; it.icon = v('if-icon');
+  it.description = v('if-desc');
+  const st={};
+  for (const s of ['ATK','DEF','STR','DEX','INT','CON','WIS','CHA','SPD']) {
+    const n=parseFloat(v('if-s-'+s)); if(!isNaN(n)&&n!==0) st[s]=n;
+  }
+  it.stats = st;
+  const et = v('if-et');
+  it.effect = et ? {type:et, amount:+v('if-ea')||0} : null;
+  itemDb[id] = it;
+  const d = await api('items','POST',{db:itemDb});
+  d.ok ? status('✓ items.js saved!','ok') : status('Save failed: '+d.error,'err');
+  buildItemRows(Object.values(itemDb));
+}
+
+// ────────────────────────────────────────────────────────
+// ENEMY EDITOR
+// ────────────────────────────────────────────────────────
+function filterEnemies() {
+  const q = document.getElementById('e-search').value.toLowerCase();
+  buildEnemyRows(Object.values(enemyDb).filter(e => !q||e.name?.toLowerCase().includes(q)||e.id?.includes(q)));
+}
+
+function buildEnemyRows(list) {
+  document.getElementById('e-rows').innerHTML = list.length
+    ? list.map(e => `<div class="ed-row" data-id="${e.id}" onclick="editEnemy('${e.id}')">
+        <div class="ed-rid">${e.id}</div>
+        <div class="ed-rname">${e.name}</div>
+        <span class="badge b-enemy">Lv${e.level||1}</span>
+      </div>`).join('')
+    : '<div class="empty">No enemies</div>';
+}
+
+function editEnemy(id) {
+  document.querySelectorAll('#e-rows .ed-row').forEach(r => r.classList.toggle('sel', r.dataset.id===id));
+  const en = enemyDb[id]; if (!en) return;
+  const st = en.stats||{};
+  document.getElementById('e-form').innerHTML = `
+    <div class="f-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>${en.name} <span style="color:#8b949e;font-weight:400;font-size:11px">(${id})</span></span>
+      <span style="display:flex;align-items:center;gap:6px">
+        ${en.charSprite ? `<canvas id="ef-sprite-preview" width="16" height="16" style="image-rendering:pixelated;border:1px solid #30363d;border-radius:2px"></canvas>` : ''}
+        <button class="btn" style="font-size:11px;padding:3px 8px" onclick="openSpriteBuilder(enemyDb['${id}'].charSprite, s=>{enemyDb['${id}'].charSprite=s;editEnemy('${id}')})">🎨 Build Sprite</button>
+      </span>
+    </div>
+    <div class="f-grid">
+      <div class="field"><label>Name</label><input id="ef-name" value="${esc(en.name)}"></div>
+      <div class="field"><label>Level</label><input id="ef-lv" type="number" value="${en.level||1}"></div>
+      <div class="field"><label>AI Type</label>
+        <select id="ef-ai">${['idle','patrol','chase','ranged'].map(t=>`<option${en.aiType===t?' selected':''}>${t}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>XP Reward</label><input id="ef-xp" type="number" value="${en.xpReward||0}"></div>
+      <div class="field"><label>Gold Min</label><input id="ef-gmin" type="number" value="${en.goldRange?.[0]||0}"></div>
+      <div class="field"><label>Gold Max</label><input id="ef-gmax" type="number" value="${en.goldRange?.[1]||0}"></div>
+      <div class="field"><label>Aggro Range</label><input id="ef-ar" type="number" value="${en.aggroRange||80}"></div>
+      <div class="field"><label>Attack Range</label><input id="ef-atkr" type="number" value="${en.attackRange||16}"></div>
+      <div class="field"><label>Attack Speed (s)</label><input id="ef-atksp" type="number" step="0.1" value="${en.attackSpeed||2}"></div>
+    </div>
+    <div class="sec">Base Stats</div>
+    <div class="f-grid">
+      ${['STR','DEX','INT','CON','WIS','CHA'].map(s=>
+        `<div class="field"><label>${s}</label><input id="ef-s-${s}" type="number" value="${st[s]||0}"></div>`).join('')}
+    </div>
+    <div class="sec" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Loot Tables (shared)</span>
+    </div>
+    <div id="ef-lt-chips" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px"></div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <select id="ef-lt-add" style="flex:1;background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:4px 6px;border-radius:4px;font:inherit;font-size:12px">
+        <option value="">— add loot table —</option>
+        ${Object.keys(lootTableDb).map(k=>`<option value="${k}">${lootTableDb[k]?.name??k}</option>`).join('')}
+      </select>
+      <button class="btn" style="padding:3px 10px;font-size:12px" onclick="efAddLootTable()">+ Add</button>
+    </div>
+    <div class="sec" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Extra Drops (this enemy only)</span>
+      <button class="btn" style="padding:2px 8px;font-size:11px" onclick="eAddDrop()">+ Add</button>
+    </div>
+    <div id="ef-drops"></div>
+    <div class="f-actions">
+      <button class="btn primary" onclick="saveEnemy('${id}')">💾 Save Enemy</button>
+      <button class="btn" onclick="duplicateEnemy('${id}')">⧉ Duplicate</button>
+    </div>`;
+  _editDropTable = JSON.parse(JSON.stringify(en.dropTable||[]));
+  _editLootTableIds = [...(en.lootTableIds ?? (en.lootTableId ? [en.lootTableId] : []))];
+  setTimeout(() => { buildDropRows(); buildLtChips(); drawSpritePreview('ef-sprite-preview', en.charSprite); }, 0);
+}
+
+async function saveEnemy(id) {
+  const en = {...enemyDb[id]};
+  en.name=v('ef-name'); en.level=+v('ef-lv')||1; en.aiType=v('ef-ai');
+  en.xpReward=+v('ef-xp')||0; en.goldRange=[+v('ef-gmin')||0,+v('ef-gmax')||0];
+  en.aggroRange=+v('ef-ar')||80; en.attackRange=+v('ef-atkr')||16;
+  en.attackSpeed=+v('ef-atksp')||2;
+  const st={};
+  for (const s of ['STR','DEX','INT','CON','WIS','CHA']) st[s]=+v('ef-s-'+s)||0;
+  en.stats=st;
+  en.lootTableIds = [..._editLootTableIds];
+  delete en.lootTableId;    // remove legacy field
+  delete en.charSheetIdx;   // migrated to charSprite
+  en.dropTable = _editDropTable.filter(d => d.itemId);
+  enemyDb[id]=en;
+  const d = await api('enemies','POST',{db:enemyDb});
+  d.ok ? status('✓ enemies.js saved!','ok') : status('Save failed: '+d.error,'err');
+  buildEnemyRows(Object.values(enemyDb));
+}
+
+// ────────────────────────────────────────────────────────
+// NPC EDITOR
+// ────────────────────────────────────────────────────────
+let _npcSchedule = []; // editable schedule for current NPC
+
+function filterNpcs() {
+  const q = document.getElementById('n-search').value.toLowerCase();
+  buildNpcRows(Object.values(npcDb).filter(n => !q||n.name?.toLowerCase().includes(q)||n.id?.includes(q)));
+}
+
+function buildNpcRows(list) {
+  document.getElementById('n-rows').innerHTML = list.length
+    ? list.map(n => `<div class="ed-row" data-id="${n.id}" onclick="editNpc('${n.id}')">
+        <div class="ed-rid">${n.id}</div>
+        <div class="ed-rname">${n.name}</div>
+        <span class="badge b-npc">${n.combatBehavior||n.role||'npc'}</span>
+      </div>`).join('')
+    : '<div class="empty">No NPCs</div>';
+}
+
+function editNpc(id) {
+  document.querySelectorAll('#n-rows .ed-row').forEach(r => r.classList.toggle('sel', r.dataset.id===id));
+  const n = npcDb[id]; if (!n) return;
+  _npcSchedule = JSON.parse(JSON.stringify(n.schedule||[]));
+  const cs = n.combatStats||{};
+  document.getElementById('n-form').innerHTML = `
+    <div class="f-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>${n.name} <span style="color:#8b949e;font-weight:400;font-size:11px">(${id})</span></span>
+      <span style="display:flex;align-items:center;gap:6px">
+        ${n.charSprite ? `<canvas id="nf-sprite-preview" width="16" height="16" style="image-rendering:pixelated;border:1px solid #30363d;border-radius:2px"></canvas>` : ''}
+        <button class="btn" style="font-size:11px;padding:3px 8px" onclick="openSpriteBuilder(npcDb['${id}'].charSprite, s=>{npcDb['${id}'].charSprite=s;editNpc('${id}')})">🎨 Build Sprite</button>
+      </span>
+    </div>
+    <div class="f-grid">
+      <div class="field"><label>Name</label><input id="nf-name" value="${esc(n.name||'')}"></div>
+      <div class="field"><label>Sprite</label><input id="nf-sprite" value="${esc(n.sprite||'')}"></div>
+      <div class="field"><label>Shop ID</label><input id="nf-shop" value="${esc(n.shopId||'')}"></div>
+      <div class="field"><label>Dialogue Tree</label><input id="nf-dlg" value="${esc(n.dialogueTree||'')}"></div>
+      <div class="field"><label>Combat Behavior</label>
+        <select id="nf-cb">
+          <option value="">neutral</option>
+          <option value="guard"${n.combatBehavior==='guard'?' selected':''}>guard</option>
+          <option value="coward"${n.combatBehavior==='coward'?' selected':''}>coward</option>
+        </select>
+      </div>
+      <div class="field"><label>Guard Range</label><input id="nf-gr" type="number" value="${n.guardRange||150}"></div>
+      <div class="field"><label>Flee Range</label><input id="nf-fr" type="number" value="${n.fleeRange||120}"></div>
+    </div>
+    <div class="sec">Combat Stats <span style="color:#8b949e;font-size:10px">(leave 0 if non-combatant)</span></div>
+    <div class="f-grid">
+      ${['STR','DEX','INT','CON','WIS','CHA'].map(s=>
+        `<div class="field"><label>${s}</label><input id="nf-cs-${s}" type="number" value="${cs[s]||0}"></div>`).join('')}
+    </div>
+    <div class="sec" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Schedule</span>
+      <button class="btn" style="padding:2px 8px;font-size:11px" onclick="nfAddSlot()">+ Add Slot</button>
+    </div>
+    <div id="nf-schedule"></div>
+    <div class="f-actions">
+      <button class="btn primary" onclick="saveNpc('${id}')">💾 Save NPC</button>
+      <button class="btn" onclick="duplicateNpc('${id}')">⧉ Duplicate</button>
+    </div>`;
+  setTimeout(() => { buildNpcSchedule(); drawSpritePreview('nf-sprite-preview', n.charSprite); }, 0);
+}
+
+function buildNpcSchedule() {
+  const el = document.getElementById('nf-schedule'); if (!el) return;
+  el.innerHTML = _npcSchedule.length
+    ? `<table style="width:100%;border-collapse:collapse;font-size:11px">
+        <tr style="color:#8b949e"><th style="padding:2px 4px">From</th><th>To</th><th>X (px)</th><th>Y (px)</th><th>State</th><th></th></tr>
+        ${_npcSchedule.map((s,i) => `
+        <tr>
+          <td><input type="number" min="0" max="24" value="${s.timeStart??0}" style="width:44px" oninput="_npcSchedule[${i}].timeStart=+this.value"></td>
+          <td><input type="number" min="0" max="24" value="${s.timeEnd??0}" style="width:44px" oninput="_npcSchedule[${i}].timeEnd=+this.value"></td>
+          <td><input type="number" value="${s.x??0}" style="width:58px" oninput="_npcSchedule[${i}].x=+this.value"></td>
+          <td><input type="number" value="${s.y??0}" style="width:58px" oninput="_npcSchedule[${i}].y=+this.value"></td>
+          <td><select oninput="_npcSchedule[${i}].state=this.value">
+            ${['idle','sleep','work','patrol'].map(st=>`<option${s.state===st?' selected':''}>${st}</option>`).join('')}
+          </select></td>
+          <td><button onclick="_npcSchedule.splice(${i},1);buildNpcSchedule()" style="background:#8b0000;border:none;color:#fff;padding:2px 5px;border-radius:3px;cursor:pointer">✕</button></td>
+        </tr>`).join('')}
+      </table>`
+    : '<div style="color:#8b949e;font-size:11px;padding:4px">No schedule — NPC stays at spawn position.</div>';
+}
+
+function nfAddSlot() {
+  _npcSchedule.push({ timeStart: 8, timeEnd: 20, x: 0, y: 0, state: 'idle' });
+  buildNpcSchedule();
+}
+
+async function saveNpc(id) {
+  const n = { ...npcDb[id] };
+  n.name = v('nf-name'); n.sprite = v('nf-sprite');
+  n.shopId = v('nf-shop') || null; n.dialogueTree = v('nf-dlg') || null;
+  const cb = v('nf-cb');
+  if (cb) {
+    n.combatBehavior = cb;
+    n.guardRange = +v('nf-gr') || 150;
+    n.fleeRange  = +v('nf-fr') || 120;
+  } else {
+    delete n.combatBehavior; delete n.guardRange; delete n.fleeRange;
+  }
+  const cs = {};
+  let hasCS = false;
+  for (const s of ['STR','DEX','INT','CON','WIS','CHA']) { cs[s] = +v('nf-cs-'+s)||0; if (cs[s]) hasCS = true; }
+  n.combatStats = hasCS ? cs : (npcDb[id].combatStats || undefined);
+  n.schedule = _npcSchedule;
+  delete n.charSheetIdx; // migrated to charSprite
+  npcDb[id] = n;
+  const d = await api('npcs','POST',{db:npcDb});
+  d.ok ? status('✓ npcs.js saved!','ok') : status('Save failed: '+d.error,'err');
+  buildNpcRows(Object.values(npcDb));
+}
+
+// ────────────────────────────────────────────────────────
+// SHOP EDITOR
+// ────────────────────────────────────────────────────────
+let shopDb = {};
+let _editShopItems = []; // editable items for selected shop
+
+async function loadShops() { try { shopDb = await api('shops'); } catch{} }
+
+function buildShopRows() {
+  document.getElementById('sh-rows').innerHTML = Object.keys(shopDb).length
+    ? Object.keys(shopDb).map(id => `
+        <div class="ed-row" data-id="${id}" onclick="editShop('${id}')">
+          <div class="ed-rid">${id}</div>
+          <div class="ed-rname" style="color:#8b949e;font-size:10px">${shopDb[id].length} items</div>
+        </div>`).join('')
+    : '<div class="empty">No shops</div>';
+}
+
+function editShop(id) {
+  document.querySelectorAll('#sh-rows .ed-row').forEach(r => r.classList.toggle('sel', r.dataset.id===id));
+  _editShopItems = JSON.parse(JSON.stringify(shopDb[id]||[]));
+  document.getElementById('sh-form').innerHTML = `
+    <div class="f-title">${id}</div>
+    <div class="sec" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Stock</span>
+      <button class="btn" style="padding:2px 8px;font-size:11px" onclick="shAddItem()">+ Add Item</button>
+    </div>
+    <div id="sh-items"></div>
+    <div class="f-actions">
+      <button class="btn primary" onclick="saveShop('${id}')">💾 Save Shop</button>
+      <button class="btn" style="background:#8b0000" onclick="shDeleteShop('${id}')">✕ Delete Shop</button>
+    </div>`;
+  setTimeout(buildShopItems, 0);
+}
+
+function buildShopItems() {
+  const el = document.getElementById('sh-items'); if (!el) return;
+  el.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <tr style="color:#8b949e"><th style="padding:2px 4px;text-align:left">Item ID</th><th>Qty (blank=∞)</th><th>Price (blank=auto)</th><th></th></tr>
+      ${_editShopItems.map((it,i) => `
+      <tr>
+        <td><input list="dev-item-ids" value="${it.itemId||''}" style="width:160px" oninput="_editShopItems[${i}].itemId=this.value"></td>
+        <td><input type="number" min="1" value="${it.qty==='__INF__'||it.qty===null?'':it.qty}" placeholder="∞" style="width:60px"
+          oninput="_editShopItems[${i}].qty=this.value===''?null:+this.value"></td>
+        <td><input type="number" min="1" value="${it.price||''}" placeholder="auto" style="width:60px"
+          oninput="_editShopItems[${i}].price=this.value===''?null:+this.value"></td>
+        <td><button onclick="_editShopItems.splice(${i},1);buildShopItems()" style="background:#8b0000;border:none;color:#fff;padding:2px 5px;border-radius:3px;cursor:pointer">✕</button></td>
+      </tr>`).join('')}
+    </table>`;
+}
+
+function shAddItem() {
+  _editShopItems.push({ itemId: '', qty: null, price: null });
+  buildShopItems();
+}
+
+async function saveShop(id) {
+  shopDb[id] = _editShopItems.filter(it => it.itemId);
+  const d = await api('shops','POST',{db:shopDb});
+  d.ok ? status('✓ shops.js saved!','ok') : status('Save failed: '+d.error,'err');
+  buildShopRows();
+}
+
+function shAddShop() {
+  const id = prompt('New shop ID (e.g. ashenvale_general):');
+  if (!id?.trim()) return;
+  shopDb[id.trim()] = [];
+  buildShopRows();
+  editShop(id.trim());
+}
+
+async function shDeleteShop(id) {
+  if (!confirm(`Delete shop "${id}"?`)) return;
+  delete shopDb[id];
+  const d = await api('shops','POST',{db:shopDb});
+  d.ok ? status('✓ shops.js saved!','ok') : status('Save failed: '+d.error,'err');
+  buildShopRows();
+  document.getElementById('sh-form').innerHTML = '<div class="empty">Select a shop to edit</div>';
+}
+
+// ────────────────────────────────────────────────────────
+// LOOT TABLES
+// ────────────────────────────────────────────────────────
+let lootTableDb = {};
+let _editLtDrops = [];
+
+async function loadLootTables() { try { lootTableDb = await api('loottables'); } catch{} }
+
+function buildLtRows() {
+  const list = document.getElementById('lt-list');
+  if (!list) return;
+  list.innerHTML = Object.values(lootTableDb).map(t =>
+    `<div class="ed-row" onclick="editLootTable('${t.id}')">${t.name ?? t.id}</div>`
+  ).join('');
+}
+
+function editLootTable(id) {
+  const t = lootTableDb[id];
+  if (!t) return;
+  _editLtDrops = JSON.parse(JSON.stringify(t.drops ?? []));
+  document.querySelectorAll('#lt-list .ed-row').forEach(r => r.classList.toggle('sel', r.textContent.trim() === (t.name ?? id)));
+  document.getElementById('lt-form').innerHTML = `
+    <div class="f-title">${t.name ?? id} <span style="color:#8b949e;font-weight:400;font-size:11px">(${id})</span></div>
+    <div class="f-grid" style="grid-template-columns:1fr"><div class="field"><label>Name</label><input id="lt-name" value="${t.name ?? ''}"></div></div>
+    <div class="sec" style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+      <span>Drops</span>
+      <button class="btn" style="padding:2px 8px;font-size:11px" onclick="ltAddDrop()">+ Add</button>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px">
+      <thead><tr>
+        <th style="text-align:left;padding:2px 4px;color:#8b949e">Item ID</th>
+        <th style="padding:2px 4px;color:#8b949e">Chance</th>
+        <th style="padding:2px 4px;color:#8b949e">Qty</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="lt-drop-body"></tbody>
+    </table>
+    <div class="f-actions" style="margin-top:12px">
+      <button class="btn primary" onclick="saveLootTable('${id}')">💾 Save</button>
+      <button class="btn" onclick="duplicateLootTable('${id}')">⧉ Duplicate</button>
+      <button class="btn" style="background:#8b0000" onclick="ltDeleteTable('${id}')">✕ Delete</button>
+    </div>`;
+  buildLtDropRows();
+}
+
+function buildLtDropRows() {
+  const body = document.getElementById('lt-drop-body');
+  if (!body) return;
+  body.innerHTML = _editLtDrops.map((d, i) => `
+    <tr>
+      <td><input list="dev-item-ids" value="${d.itemId ?? ''}" style="width:130px;background:#161b22;color:#c9d1d9;border:1px solid #30363d;padding:2px 4px;border-radius:3px" oninput="_editLtDrops[${i}].itemId=this.value"></td>
+      <td style="text-align:center"><input type="number" min="0" max="1" step="0.01" value="${d.chance ?? 0.5}" style="width:56px;background:#161b22;color:#c9d1d9;border:1px solid #30363d;padding:2px;border-radius:3px;text-align:center" oninput="_editLtDrops[${i}].chance=parseFloat(this.value)||0"></td>
+      <td style="text-align:center"><input type="number" min="1" value="${d.qty ?? 1}" style="width:40px;background:#161b22;color:#c9d1d9;border:1px solid #30363d;padding:2px;border-radius:3px;text-align:center" oninput="_editLtDrops[${i}].qty=parseInt(this.value)||1"></td>
+      <td><button class="btn btn-danger" style="padding:1px 6px;font-size:11px;background:#8b0000" onclick="_editLtDrops.splice(${i},1);buildLtDropRows()">✕</button></td>
+    </tr>`).join('');
+}
+
+function ltAddDrop() {
+  _editLtDrops.push({ itemId: '', chance: 0.5, qty: 1 });
+  buildLtDropRows();
+}
+
+async function saveLootTable(id) {
+  const t = lootTableDb[id];
+  t.name = document.getElementById('lt-name').value.trim() || id;
+  t.drops = _editLtDrops.filter(d => d.itemId);
+  const d = await api('loottables', 'POST', { db: lootTableDb });
+  d.ok ? status('✓ lootTables.js saved!', 'ok') : status('Save failed: ' + d.error, 'err');
+  buildLtRows();
+}
+
+function ltAddTable() {
+  const newId = prompt('New loot table ID:');
+  if (!newId || lootTableDb[newId]) { if (newId) alert('ID already taken'); return; }
+  lootTableDb[newId] = { id: newId, name: newId, drops: [] };
+  buildLtRows();
+  editLootTable(newId);
+}
+
+async function ltDeleteTable(id) {
+  if (!confirm(`Delete loot table "${id}"?`)) return;
+  delete lootTableDb[id];
+  await api('loottables', 'POST', { db: lootTableDb });
+  buildLtRows();
+  document.getElementById('lt-form').innerHTML = '<div class="empty">Select a loot table to edit</div>';
+}
+
+function duplicateLootTable(id) {
+  const newId = prompt('New loot table ID:', id + '_copy');
+  if (!newId || newId === id || lootTableDb[newId]) { alert('Invalid or taken ID'); return; }
+  lootTableDb[newId] = JSON.parse(JSON.stringify(lootTableDb[id]));
+  lootTableDb[newId].id = newId;
+  buildLtRows();
+  editLootTable(newId);
+}
+
+// ────────────────────────────────────────────────────────
+// SPRITE BUILDER
+// ────────────────────────────────────────────────────────
+let charImg = null;
+const CHAR_STRIDE = 17; // 16px tile + 1px margin
+
+async function loadCharSheet() {
+  try { charImg = await loadImg('/assets/tilesets/roguelikeChar_transparent.png'); } catch {}
+}
+
+function charSheetCols() {
+  return charImg ? Math.floor((charImg.width + 1) / CHAR_STRIDE) : 1;
+}
+
+// Builder state
+// sbLayers: array of { idx, mirror } objects
+let sbCallback = null;
+let sbBase = null;
+let sbLayers = [];   // [{ idx, mirror }, ...]
+let sbMode = 'base'; // 'base' | 'layer'
+let sbZoom = 3;
+
+// Normalise a layer entry from stored format (number or object) to { idx, mirror }
+function sbNormLayer(l) { return typeof l === 'number' ? { idx: l, mirror: false } : { idx: l.idx, mirror: !!l.mirror }; }
+
+function openSpriteBuilder(existing, callback) {
+  sbCallback = callback;
+  sbBase = existing?.base ?? null;
+  sbLayers = (existing?.layers ?? []).map(sbNormLayer);
+  sbMode = 'base';
+  document.getElementById('sb-modal').style.display = 'flex';
+  sbUpdateModeButtons();
+  sbDrawSheet();
+  sbRenderLayers();
+  sbUpdatePreview();
+}
+
+function sbClose() {
+  document.getElementById('sb-modal').style.display = 'none';
+  sbCallback = null;
+}
+
+function sbConfirm() {
+  if (sbBase == null) { alert('Select a base sprite first (click 🧍 Set Base, then click a tile)'); return; }
+  if (sbCallback) sbCallback({ base: sbBase, layers: sbLayers.map(l => ({ idx: l.idx, mirror: l.mirror })) });
+  sbClose();
+}
+
+function sbClear() {
+  if (sbCallback) sbCallback(null);
+  sbClose();
+}
+
+function sbSetMode(mode) {
+  sbMode = mode;
+  sbUpdateModeButtons();
+}
+
+function sbUpdateModeButtons() {
+  document.getElementById('sb-btn-base').className  = sbMode === 'base'  ? 'btn primary' : 'btn';
+  document.getElementById('sb-btn-layer').className = sbMode === 'layer' ? 'btn primary' : 'btn';
+}
+
+function sbDrawSheet() {
+  const canvas = document.getElementById('sb-canvas');
+  if (!charImg || !canvas) return;
+  const Z = parseInt(document.getElementById('sb-zoom')?.value ?? 3);
+  sbZoom = Z;
+  const cols = charSheetCols();
+  const rows = Math.floor((charImg.height + 1) / CHAR_STRIDE);
+  canvas.width  = cols * CHAR_STRIDE * Z;
+  canvas.height = rows * CHAR_STRIDE * Z;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(charImg, 0, 0, charImg.width, charImg.height, 0, 0, charImg.width * Z, charImg.height * Z);
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.5;
+  for (let c = 0; c <= cols; c++) {
+    ctx.beginPath(); ctx.moveTo(c * CHAR_STRIDE * Z, 0); ctx.lineTo(c * CHAR_STRIDE * Z, canvas.height); ctx.stroke();
+  }
+  for (let r = 0; r <= rows; r++) {
+    ctx.beginPath(); ctx.moveTo(0, r * CHAR_STRIDE * Z); ctx.lineTo(canvas.width, r * CHAR_STRIDE * Z); ctx.stroke();
+  }
+  // Unequipped zone tint
+  ctx.fillStyle = 'rgba(80,180,80,0.07)'; ctx.fillRect(0, 0, 2 * CHAR_STRIDE * Z, canvas.height);
+  ctx.strokeStyle = 'rgba(80,180,80,0.35)'; ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, 2 * CHAR_STRIDE * Z - 1, canvas.height - 1);
+  // Highlight base (blue)
+  if (sbBase != null) {
+    const bc = sbBase % cols, br = Math.floor(sbBase / cols);
+    ctx.strokeStyle = '#4af'; ctx.lineWidth = 2;
+    ctx.strokeRect(bc * CHAR_STRIDE * Z + 1, br * CHAR_STRIDE * Z + 1, 16 * Z - 2, 16 * Z - 2);
+  }
+  // Highlight layers (pink), mirrored layers get ↔ label
+  ctx.strokeStyle = '#f6a'; ctx.lineWidth = 1.5;
+  sbLayers.forEach(({ idx, mirror }, i) => {
+    const lc = idx % cols, lr = Math.floor(idx / cols);
+    ctx.strokeRect(lc * CHAR_STRIDE * Z + 1, lr * CHAR_STRIDE * Z + 1, 16 * Z - 2, 16 * Z - 2);
+    ctx.fillStyle = 'rgba(255,100,160,0.15)'; ctx.fillRect(lc * CHAR_STRIDE * Z, lr * CHAR_STRIDE * Z, 16 * Z, 16 * Z);
+    ctx.fillStyle = mirror ? '#ff0' : '#f6a';
+    ctx.font = `bold ${Math.max(8, Z * 4)}px monospace`; ctx.textAlign = 'center';
+    ctx.fillText(mirror ? '↔' + (i + 1) : String(i + 1), (lc + 0.5) * CHAR_STRIDE * Z, (lr + 0.5) * CHAR_STRIDE * Z + Z * 2);
+  });
+}
+
+function sbRenderLayers() {
+  const el = document.getElementById('sb-layers');
+  if (!el) return;
+  const cols = charSheetCols();
+  const drawThumb = (canvasId, idx, mirror) => {
+    if (idx == null || !charImg) return;
+    setTimeout(() => {
+      const c2 = document.getElementById(canvasId);
+      if (!c2) return;
+      const ctx2 = c2.getContext('2d');
+      ctx2.imageSmoothingEnabled = false;
+      ctx2.clearRect(0, 0, 16, 16);
+      const tc = idx % cols, tr = Math.floor(idx / cols);
+      if (mirror) {
+        ctx2.save(); ctx2.translate(16, 0); ctx2.scale(-1, 1);
+        ctx2.drawImage(charImg, tc * CHAR_STRIDE, tr * CHAR_STRIDE, 16, 16, 0, 0, 16, 16);
+        ctx2.restore();
+      } else {
+        ctx2.drawImage(charImg, tc * CHAR_STRIDE, tr * CHAR_STRIDE, 16, 16, 0, 0, 16, 16);
+      }
+    }, 0);
+  };
+  let html = `<div style="display:flex;align-items:center;gap:6px;background:#21262d;border-radius:4px;padding:3px 6px">
+    <canvas id="sb-base-th" width="16" height="16" style="image-rendering:pixelated;border:1px solid #4af;border-radius:2px"></canvas>
+    <span style="font-size:11px;color:#4af;flex:1">Base${sbBase != null ? '' : ' — none'}</span>
+  </div>`;
+  sbLayers.forEach(({ idx, mirror }, i) => {
+    html += `<div style="display:flex;align-items:center;gap:4px;background:#21262d;border-radius:4px;padding:3px 6px">
+      <canvas id="sb-lt-${i}" width="16" height="16" style="image-rendering:pixelated;border:1px solid ${mirror?'#ff0':'#f6a'};border-radius:2px"></canvas>
+      <span style="font-size:11px;color:#f6a;flex:1">L${i + 1}<span style="color:#555;font-size:10px"> idx ${idx}</span></span>
+      <button title="Toggle mirror" onclick="sbToggleMirror(${i})"
+        style="background:${mirror?'#443300':'#21262d'};border:1px solid ${mirror?'#ff0':'#444'};color:${mirror?'#ff0':'#8b949e'};cursor:pointer;font-size:12px;border-radius:3px;padding:1px 5px;line-height:1">↔</button>
+      <button onclick="sbRemoveLayer(${i})" style="background:none;border:none;color:#8b949e;cursor:pointer;font-size:13px;line-height:1;padding:0">✕</button>
+    </div>`;
+  });
+  el.innerHTML = html;
+  drawThumb('sb-base-th', sbBase, false);
+  sbLayers.forEach(({ idx, mirror }, i) => drawThumb(`sb-lt-${i}`, idx, mirror));
+}
+
+function sbToggleMirror(i) {
+  sbLayers[i].mirror = !sbLayers[i].mirror;
+  sbRenderLayers(); sbDrawSheet(); sbUpdatePreview();
+}
+
+function sbRemoveLayer(i) {
+  sbLayers.splice(i, 1);
+  sbRenderLayers(); sbDrawSheet(); sbUpdatePreview();
+}
+
+function sbUpdatePreview() {
+  const canvas = document.getElementById('sb-preview');
+  if (!canvas || !charImg) return;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, 64, 64);
+  const cols = charSheetCols();
+  const drawLayer = (idx, mirror) => {
+    const tc = idx % cols, tr = Math.floor(idx / cols);
+    if (mirror) {
+      ctx.save(); ctx.translate(64, 0); ctx.scale(-1, 1);
+      ctx.drawImage(charImg, tc * CHAR_STRIDE, tr * CHAR_STRIDE, 16, 16, 0, 0, 64, 64);
+      ctx.restore();
+    } else {
+      ctx.drawImage(charImg, tc * CHAR_STRIDE, tr * CHAR_STRIDE, 16, 16, 0, 0, 64, 64);
+    }
+  };
+  if (sbBase != null) drawLayer(sbBase, false);
+  sbLayers.forEach(({ idx, mirror }) => drawLayer(idx, mirror));
+}
+
+document.getElementById('sb-canvas').addEventListener('click', e => {
+  if (!charImg) return;
+  const col = Math.floor(e.offsetX / (CHAR_STRIDE * sbZoom));
+  const row = Math.floor(e.offsetY / (CHAR_STRIDE * sbZoom));
+  const idx = row * charSheetCols() + col;
+  if (sbMode === 'base') {
+    sbBase = idx;
+  } else {
+    if (!sbLayers.find(l => l.idx === idx)) sbLayers.push({ idx, mirror: false });
+  }
+  sbDrawSheet(); sbRenderLayers(); sbUpdatePreview();
+});
+
+document.getElementById('sb-canvas').addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (!charImg) return;
+  const col = Math.floor(e.offsetX / (CHAR_STRIDE * sbZoom));
+  const row = Math.floor(e.offsetY / (CHAR_STRIDE * sbZoom));
+  const idx = row * charSheetCols() + col;
+  const li = sbLayers.findIndex(l => l.idx === idx);
+  if (li >= 0) { sbLayers.splice(li, 1); sbDrawSheet(); sbRenderLayers(); sbUpdatePreview(); }
+  else if (sbBase === idx) { sbBase = null; sbDrawSheet(); sbRenderLayers(); sbUpdatePreview(); }
+});
+
+document.getElementById('sb-canvas').addEventListener('mousemove', e => {
+  if (!charImg) return;
+  const col = Math.floor(e.offsetX / (CHAR_STRIDE * sbZoom));
+  const row = Math.floor(e.offsetY / (CHAR_STRIDE * sbZoom));
+  const idx = row * charSheetCols() + col;
+  document.getElementById('sb-hover').textContent = `row ${row} col ${col} → idx ${idx}`;
+});
+
+// Draw composite preview into a canvas element (handles { idx, mirror } layers)
+function drawSpritePreview(canvasId, charSprite) {
+  if (!charSprite || !charImg) return;
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  const cols = charSheetCols();
+  const ctx = el.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, el.width, el.height);
+  const drawLayer = (idx, mirror) => {
+    const tc = idx % cols, tr = Math.floor(idx / cols);
+    if (mirror) {
+      ctx.save(); ctx.translate(el.width, 0); ctx.scale(-1, 1);
+      ctx.drawImage(charImg, tc * CHAR_STRIDE, tr * CHAR_STRIDE, 16, 16, 0, 0, el.width, el.height);
+      ctx.restore();
+    } else {
+      ctx.drawImage(charImg, tc * CHAR_STRIDE, tr * CHAR_STRIDE, 16, 16, 0, 0, el.width, el.height);
+    }
+  };
+  drawLayer(charSprite.base, false);
+  (charSprite.layers ?? []).forEach(l => {
+    const norm = typeof l === 'number' ? { idx: l, mirror: false } : l;
+    drawLayer(norm.idx, norm.mirror);
+  });
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('sb-modal').style.display === 'flex') sbClose();
+});
+
+// ────────────────────────────────────────────────────────
+// DUPLICATE helpers
+// ────────────────────────────────────────────────────────
+function duplicateItem(id) {
+  const newId = prompt('New item ID:', id + '_copy');
+  if (!newId || newId === id || itemDb[newId]) { alert('Invalid or taken ID'); return; }
+  itemDb[newId] = JSON.parse(JSON.stringify(itemDb[id]));
+  itemDb[newId].id = newId;
+  buildItemRows(Object.values(itemDb));
+  editItem(newId);
+}
+
+function duplicateEnemy(id) {
+  const newId = prompt('New enemy ID:', id + '_copy');
+  if (!newId || newId === id || enemyDb[newId]) { alert('Invalid or taken ID'); return; }
+  enemyDb[newId] = JSON.parse(JSON.stringify(enemyDb[id]));
+  enemyDb[newId].id = newId;
+  buildEnemyRows(Object.values(enemyDb));
+  editEnemy(newId);
+}
+
+function duplicateNpc(id) {
+  const newId = prompt('New NPC ID:', id + '_copy');
+  if (!newId || newId === id || npcDb[newId]) { alert('Invalid or taken ID'); return; }
+  npcDb[newId] = JSON.parse(JSON.stringify(npcDb[id]));
+  npcDb[newId].id = newId;
+  buildNpcRows(Object.values(npcDb));
+  editNpc(newId);
+}
+
+// ────────────────────────────────────────────────────────
+// WORLD EDITOR
+// ────────────────────────────────────────────────────────
+let weMode = 'tiles';        // 'tiles' | 'overlays'
+let weDirty = false;         // unsaved changes
+let weSelOv = null;          // selected overlay item { type, index }
+let weDragging = null;       // { type, index, wx0, wy0, origX?, origY?, origRect?, resizeHandle? }
+let wePanStart = null;       // { mx, my, scrollLeft, scrollTop } for MMB pan
+let weDrawingSpawn = null;   // { enemyId, active, wx0, wy0, wx1, wy1 } — paint-new-spawn mode
+let _weDrawingTrans = null;  // { toZone, id, active, wx0, wy0, wx1, wy1 } — paint-new-transition mode
+let _weAddNpcId = null;      // pending NPC placement (click to place)
+let _weIncomingList = [];    // [{ t, fromZone }] — arrival pts for current zone; t is live object in _weZoneLinks
+let _weIncomingDirty = new Set(); // set of fromZone IDs with unsaved toX/toY edits
+
+// Overlay colours
+const OV_CLR = { transition:'#f0b429', npc:'#3fb950', spawn:'#f85149', spawnPt:'#a371f7', incoming:'#58a6ff' };
+
+const HANDLE_CURSORS = {
+  TL:'nw-resize', TM:'n-resize',  TR:'ne-resize',
+  ML:'w-resize',                   MR:'e-resize',
+  BL:'sw-resize', BM:'s-resize',  BR:'se-resize',
+};
+const HANDLE_R = 6; // hit radius in screen px
+
+// Returns handle ID ('TL'..'BR') if (wx,wy) is near a resize handle on selected rect overlay
+function weHitHandle(wx, wy) {
+  if (!weSelOv) return null;
+  const { type, index } = weSelOv;
+  if (type !== 'spawn' && type !== 'transition') return null;
+  const item = type === 'spawn' ? weZoneData.spawns[index] : weZoneData.transitions[index];
+  const r = item.rect;
+  const hr = HANDLE_R / weZoom;
+  const pts = [
+    { id:'TL', hx:r.x,       hy:r.y        },
+    { id:'TM', hx:r.x+r.w/2, hy:r.y        },
+    { id:'TR', hx:r.x+r.w,   hy:r.y        },
+    { id:'ML', hx:r.x,       hy:r.y+r.h/2  },
+    { id:'MR', hx:r.x+r.w,   hy:r.y+r.h/2  },
+    { id:'BL', hx:r.x,       hy:r.y+r.h    },
+    { id:'BM', hx:r.x+r.w/2, hy:r.y+r.h    },
+    { id:'BR', hx:r.x+r.w,   hy:r.y+r.h    },
+  ];
+  for (const h of pts)
+    if (Math.abs(wx - h.hx) <= hr && Math.abs(wy - h.hy) <= hr) return h.id;
+  return null;
+}
+
+// Enter paint-new-spawn mode — show searchable modal instead of prompt()
+function weStartAddSpawn() {
+  if (!weZoneData) return;
+  const modal = document.getElementById('we-add-spawn-modal');
+  const inp   = document.getElementById('we-add-spawn-input');
+  inp.value = '';
+  modal.style.display = 'flex';
+  setTimeout(() => inp.focus(), 30);
+}
+function weConfirmAddSpawn() {
+  const enemyId = document.getElementById('we-add-spawn-input').value.trim();
+  document.getElementById('we-add-spawn-modal').style.display = 'none';
+  if (!enemyId) return;
+  weDrawingSpawn = { enemyId, active: false };
+  weCanvas.style.cursor = 'cell';
+  document.getElementById('we-hint').textContent =
+    `Drawing spawn for "${enemyId}" — click-drag to place rect, Esc cancel`;
+}
+
+// Add NPC to world overlay — show modal then click to place
+function weStartAddNpc() {
+  if (!weZoneData) return;
+  const modal = document.getElementById('we-add-npc-modal');
+  const inp   = document.getElementById('we-add-npc-input');
+  inp.value = '';
+  modal.style.display = 'flex';
+  setTimeout(() => inp.focus(), 30);
+}
+function weConfirmAddNpc() {
+  const npcId = document.getElementById('we-add-npc-input').value.trim();
+  document.getElementById('we-add-npc-modal').style.display = 'none';
+  if (!npcId) return;
+  _weAddNpcId = npcId;
+  weCanvas.style.cursor = 'cell';
+  document.getElementById('we-hint').textContent =
+    `Placing NPC "${npcId}" — click to place, Esc cancel`;
+}
+function weAddNpcCancel() {
+  document.getElementById('we-add-npc-modal').style.display = 'none';
+  _weAddNpcId = null;
+  weCanvas.style.cursor = 'default';
+}
+
+function weStartAddTrans() {
+  if (!weZoneData) return;
+  document.getElementById('we-add-trans-zone').value = '';
+  document.getElementById('we-add-trans-id').value   = '';
+  document.getElementById('we-add-trans-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('we-add-trans-zone').focus(), 30);
+}
+function weConfirmAddTrans() {
+  const toZone = document.getElementById('we-add-trans-zone').value.trim();
+  const id     = document.getElementById('we-add-trans-id').value.trim() || ('exit_' + toZone);
+  document.getElementById('we-add-trans-modal').style.display = 'none';
+  if (!toZone) return;
+  _weDrawingTrans = { toZone, id, active: false };
+  weCanvas.style.cursor = 'cell';
+  document.getElementById('we-hint').textContent =
+    `Drawing transition → "${toZone}" — click-drag to place rect, Esc cancel`;
+}
+function weAddTransCancel() {
+  document.getElementById('we-add-trans-modal').style.display = 'none';
+  _weDrawingTrans = null;
+  weCanvas.style.cursor = 'default';
+}
+
+// Delete the currently selected overlay item
+function weDeleteOv() {
+  if (!weSelOv) return;
+  const { type, index } = weSelOv;
+  if (type === 'transition') weZoneData.transitions.splice(index, 1);
+  else if (type === 'spawn')  weZoneData.spawns.splice(index, 1);
+  else if (type === 'npc')    weZoneData.npcs.splice(index, 1);
+  weSelOv = null;
+  weDirty = true;
+  weRebuildInspector();
+  weDrawZone();
+}
+
+// Duplicate the currently selected overlay item, offset by 2 tiles so it's visible
+function weDuplicateOv() {
+  if (!weSelOv) return;
+  const { type, index } = weSelOv;
+  const snap = weZoneData?.tileSize || 16;
+  let newItem, arr;
+  if (type === 'spawn') {
+    const s = weZoneData.spawns[index];
+    newItem = JSON.parse(JSON.stringify(s));
+    newItem.id = (s.enemyId || 'spawn') + '_spawn_' + Date.now();
+    newItem.rect.x += snap * 2;
+    newItem.rect.y += snap * 2;
+    arr = weZoneData.spawns;
+  } else if (type === 'transition') {
+    const t = weZoneData.transitions[index];
+    newItem = JSON.parse(JSON.stringify(t));
+    newItem.id = (t.id || 'trans') + '_copy_' + Date.now();
+    newItem.rect.x += snap * 2;
+    newItem.rect.y += snap * 2;
+    arr = weZoneData.transitions;
+  } else if (type === 'npc') {
+    const n = weZoneData.npcs[index];
+    newItem = JSON.parse(JSON.stringify(n));
+    newItem.id = n.id + '_copy';
+    newItem.x += snap * 2;
+    newItem.y += snap * 2;
+    arr = weZoneData.npcs;
+  } else return;
+  arr.push(newItem);
+  weSelOv = { type, index: arr.length - 1 };
+  weDirty = true;
+  weRebuildInspector();
+  weDrawZone();
+}
+
+async function weLoadZoneList() {
+  try {
+    const list = await api('zones');
+    const sel = document.getElementById('we-zone');
+    list.sort().forEach(id => {
+      const o = document.createElement('option'); o.value = o.textContent = id; sel.appendChild(o);
+    });
+    wePopulateZoneDatalist(list);
+  } catch(e) { console.error('zones list:', e); }
+}
+
+let _weZoneLinks = null; // { zoneId: [{id, toZone, toX, toY, note}] }
+
+async function weLoadZoneLinks() {
+  try {
+    _weZoneLinks = await api('zone-links');
+    weRefreshIncomingList();
+    weRebuildInspector();
+    weDrawZone();
+  } catch(e) { console.warn('zone-links:', e); }
+}
+
+function weRefreshIncomingList() {
+  _weIncomingList = [];
+  if (!_weZoneLinks || !weZoneData) return;
+  for (const [fromZone, tlist] of Object.entries(_weZoneLinks)) {
+    if (fromZone === weZoneData.id) continue;
+    for (const t of tlist) {
+      if (t.toZone === weZoneData.id) _weIncomingList.push({ t, fromZone });
+    }
+  }
+}
+
+async function weSaveIncoming(fromZone) {
+  try {
+    const srcZone = await api(`zone/${fromZone}`);
+    if (!srcZone.transitions) srcZone.transitions = [];
+    for (const { t } of _weIncomingList.filter(e => e.fromZone === fromZone)) {
+      const trs = srcZone.transitions.find(tr => tr.id === t.id);
+      if (trs) { trs.toX = t.toX; trs.toY = t.toY; if (t.note !== undefined) trs.note = t.note || undefined; }
+    }
+    const j = await api(`zone/${fromZone}`, 'POST', { transitions: srcZone.transitions });
+    if (j.ok) {
+      _weIncomingDirty.delete(fromZone);
+      status(`✓ Saved arrival pts to ${fromZone}`);
+      weLoadZoneLinks();
+    } else status(j.error ?? 'Save failed', 'err');
+  } catch(e) { status('Save failed: ' + e.message, 'err'); }
+}
+
+async function weLoadZone(forceId) {
+  const id = forceId || document.getElementById('we-zone').value;
+  if (!id) return;
+  if (weDirty && !confirm('You have unsaved changes. Discard and load new zone?')) {
+    // revert select back to current zone
+    document.getElementById('we-zone').value = weZoneData?.id || '';
+    return;
+  }
+  if (forceId) document.getElementById('we-zone').value = forceId;
+  status('Loading ' + id + '…', 'ok');
+  const d = await api('zone/' + id);
+  if (d.error) { status('Load failed: ' + d.error, 'err'); return; }
+  weZoneData = d;
+  weDirty = false;
+  weSelOv = null;
+  _weIncomingList = [];
+  _weIncomingDirty.clear();
+  weDrawZone();
+  weRebuildInspector();
+  status('Loaded: ' + id + ' (' + d.width + '×' + d.height + ')', 'ok');
+  weLoadZoneLinks();
+}
+
+function weSetMode(mode) {
+  weMode = mode;
+  document.querySelectorAll('.we-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.getElementById('we-tiles-ctrl').style.display  = mode === 'tiles'    ? '' : 'none';
+  document.getElementById('we-ov-ctrl').style.display     = mode === 'overlays' ? '' : 'none';
+  document.getElementById('we-palette').style.display     = mode === 'tiles'    ? '' : 'none';
+  document.getElementById('we-inspector').style.display   = mode === 'overlays' ? '' : 'none';
+  document.getElementById('we-hint').textContent = mode === 'tiles'
+    ? 'LClick paint · RClick erase · C copy rect · V paste · MMB pan'
+    : 'Drag NPCs/transitions · Click to inspect · MMB pan';
+  document.getElementById('we-canvas').style.cursor = mode === 'tiles' ? 'crosshair' : 'default';
+  weDrawZone();
+  if (mode === 'overlays') weRebuildInspector();
+}
+
+function weBuildPalette() {
+  const pal = document.getElementById('we-palette');
+  const tiles = [{id:0,name:'Erase',cat:'erase'}].concat(GAME_TILES);
+  pal.innerHTML = tiles.map(t => {
+    let spr;
+    if (t.id === 0) spr = `background:#111;border:1px dashed #555`;
+    else if (tileMap[t.id] != null) spr = sprStyle(tileMap[t.id], 22);
+    else spr = `background:${TILE_COLORS[t.id]||'#888'}`;
+    return `<div class="we-pi${wePaintTile===t.id?' sel':''}" onclick="weSelTile(${t.id})">
+      <div class="spr" style="${spr}"></div><span>${t.name}</span></div>`;
+  }).join('');
+}
+
+function weSelTile(id) { wePaintTile = id; weBuildPalette(); }
+
+// ── Overlay inspector (sidebar list) ──────────────────────────────────────────
+function weRebuildInspector() {
+  const el = document.getElementById('we-inspector');
+  if (!weZoneData) { el.innerHTML = '<div style="color:#8b949e;padding:8px;font-size:11px">No zone loaded</div>'; return; }
+  const { transitions=[], npcs=[], spawns=[], spawnPoint } = weZoneData;
+  let h = '';
+
+  if (spawnPoint) {
+    h += `<div class="insp-sec">Player Spawn</div>
+    <div class="insp-item${weSelOv?.type==='spawnPt'?' sel':''}" onclick="wePickOv('spawnPt',0)">
+      ★ spawn  (${spawnPoint.x},${spawnPoint.y})
+    </div>`;
+  }
+
+  h += `<div class="insp-sec" style="display:flex;justify-content:space-between;align-items:center">
+    <span>Transitions (${transitions.length})</span>
+    <button class="goto-btn" onclick="weStartAddTrans()">+ Add</button>
+  </div>`;
+  transitions.forEach((t,i) => {
+    const noteSnip = t.note ? ` <span style="color:#555;font-size:10px;font-style:italic">"${t.note.length>18?t.note.slice(0,18)+'…':t.note}"</span>` : '';
+    h += `<div class="insp-item${weSelOv?.type==='transition'&&weSelOv.index===i?' sel':''}" onclick="wePickOv('transition',${i})">
+      <span style="color:${OV_CLR.transition}">→</span> ${t.toZone}${noteSnip}
+      <button class="goto-btn" onclick="event.stopPropagation();weLoadZone('${t.toZone}')">open</button>
+    </div>`;
+  });
+
+  // Incoming arrival points from other zones
+  if (_weIncomingList.length > 0) {
+    h += `<div class="insp-sec" style="color:${OV_CLR.incoming}">Incoming (${_weIncomingList.length})</div>`;
+    _weIncomingList.forEach(({ t, fromZone }, i) => {
+      const isDirty = _weIncomingDirty.has(fromZone);
+      const noteSnip = t.note ? ` <span style="color:#445566;font-size:10px;font-style:italic">"${t.note.length>18?t.note.slice(0,18)+'…':t.note}"</span>` : '';
+      const dirtyDot = isDirty ? `<span style="color:#d29922;font-size:10px;margin-left:4px" title="Unsaved changes">●</span>` : '';
+      h += `<div class="insp-item${weSelOv?.type==='incoming'&&weSelOv.index===i?' sel':''}" onclick="wePickOv('incoming',${i})">
+        <span style="color:${OV_CLR.incoming}">←</span> ${fromZone}${noteSnip}${dirtyDot}
+        <button class="goto-btn" onclick="event.stopPropagation();weLoadZone('${fromZone}')">open</button>
+      </div>`;
+    });
+  } else if (!_weZoneLinks) {
+    h += `<div style="padding:4px 8px;font-size:10px;color:#445566">Loading incoming…</div>`;
+  }
+
+  h += `<div class="insp-sec" style="display:flex;justify-content:space-between;align-items:center">
+    <span>NPCs (${npcs.length})</span>
+    <button class="goto-btn" onclick="weStartAddNpc()">+ Add</button>
+  </div>`;
+  npcs.forEach((n,i) => {
+    h += `<div class="insp-item${weSelOv?.type==='npc'&&weSelOv.index===i?' sel':''}" onclick="wePickOv('npc',${i})">
+      <span style="color:${OV_CLR.npc}">●</span> ${n.id}
+    </div>`;
+  });
+
+  h += `<div class="insp-sec" style="display:flex;justify-content:space-between;align-items:center">
+    <span>Spawns (${spawns.length})</span>
+    <button class="goto-btn" onclick="weStartAddSpawn()">+ Add</button>
+  </div>`;
+  spawns.forEach((s,i) => {
+    h += `<div class="insp-item${weSelOv?.type==='spawn'&&weSelOv.index===i?' sel':''}" onclick="wePickOv('spawn',${i})">
+      <span style="color:${s.isBoss?'#ff4444':s.rareId?'#f0b429':OV_CLR.spawn}">${s.isBoss?'☠':s.rareId?'★':'✦'}</span> ${s.enemyId||s.id||'spawn'} ×${s.maxCount||s.count||1}${s.rareId?` <span style="color:#f0b429;font-size:10px">(${s.rareId})</span>`:''}
+    </div>`;
+  });
+
+  if (!h) h = '<div style="color:#8b949e;padding:8px;font-size:11px">No overlays in this zone</div>';
+  el.innerHTML = h;
+  weShowOvDetail();
+}
+
+function wePickOv(type, index) {
+  weSelOv = { type, index };
+  weRebuildInspector();
+  weDrawZone();
+}
+
+function weShowOvDetail() {
+  // Append an editable detail panel for the selected overlay under the list
+  const el = document.getElementById('we-inspector');
+  const existing = el.querySelector('#we-ov-detail');
+  if (existing) existing.remove();
+  if (!weSelOv || !weZoneData) return;
+
+  const detail = document.createElement('div');
+  detail.id = 'we-ov-detail';
+  detail.style.cssText = 'border-top:1px solid #30363d;margin-top:6px;padding-top:6px';
+
+  const { type, index } = weSelOv;
+  let h = '';
+
+  if (type === 'spawnPt') {
+    const sp = weZoneData.spawnPoint;
+    h = `<div class="insp-sec">Player Spawn Point</div>
+    <div class="insp-row"><label>X (px)</label><input id="ov-spx" type="number" value="${sp.x}" onchange="weZoneData.spawnPoint.x=+this.value;weDirty=true;weDrawZone()"></div>
+    <div class="insp-row"><label>Y (px)</label><input id="ov-spy" type="number" value="${sp.y}" onchange="weZoneData.spawnPoint.y=+this.value;weDirty=true;weDrawZone()"></div>`;
+
+  } else if (type === 'transition') {
+    const t = weZoneData.transitions[index];
+    h = `<div class="insp-sec">Transition: → ${t.toZone}</div>
+    <div class="insp-row"><label>To Zone</label><input value="${t.toZone}" onchange="weZoneData.transitions[${index}].toZone=this.value;weDirty=true;weRebuildInspector()"></div>
+    <div class="insp-row"><label>Rect X</label><input type="number" value="${t.rect.x}" onchange="weZoneData.transitions[${index}].rect.x=+this.value;weDirty=true;weDrawZone()"></div>
+    <div class="insp-row"><label>Rect Y</label><input type="number" value="${t.rect.y}" onchange="weZoneData.transitions[${index}].rect.y=+this.value;weDirty=true;weDrawZone()"></div>
+    <div class="insp-row"><label>Width</label><input type="number" value="${t.rect.w}" onchange="weZoneData.transitions[${index}].rect.w=+this.value;weDirty=true;weDrawZone()"></div>
+    <div class="insp-row"><label>Height</label><input type="number" value="${t.rect.h}" onchange="weZoneData.transitions[${index}].rect.h=+this.value;weDirty=true;weDrawZone()"></div>
+    <div class="insp-row"><label>Entry X</label><input type="number" value="${t.toX}" onchange="weZoneData.transitions[${index}].toX=+this.value;weDirty=true"></div>
+    <div class="insp-row"><label>Entry Y</label><input type="number" value="${t.toY}" onchange="weZoneData.transitions[${index}].toY=+this.value;weDirty=true"></div>
+    <div class="insp-row"><label>Note</label><input type="text" placeholder="optional note…" value="${t.note||''}" onchange="weZoneData.transitions[${index}].note=this.value||undefined;weDirty=true;weRebuildInspector();weDrawZone()"></div>
+    <button class="goto-btn" style="margin-top:4px" onclick="weLoadZone('${t.toZone}')">Open destination zone →</button>`;
+
+  } else if (type === 'npc') {
+    const n = weZoneData.npcs[index];
+    h = `<div class="insp-sec">NPC: ${n.id}</div>
+    <div class="insp-row"><label>X (px)</label><input type="number" value="${n.x}" onchange="weZoneData.npcs[${index}].x=+this.value;weDirty=true;weDrawZone()"></div>
+    <div class="insp-row"><label>Y (px)</label><input type="number" value="${n.y}" onchange="weZoneData.npcs[${index}].y=+this.value;weDirty=true;weDrawZone()"></div>`;
+
+  } else if (type === 'incoming') {
+    const { t, fromZone } = _weIncomingList[index];
+    const isDirty = _weIncomingDirty.has(fromZone);
+    h = `<div class="insp-sec" style="color:${OV_CLR.incoming}">Incoming from: ${fromZone}</div>
+    <div class="insp-row"><label>Entry X</label><input type="number" value="${t.toX}" onchange="_weIncomingList[${index}].t.toX=+this.value;_weIncomingDirty.add('${fromZone}');weRebuildInspector();weDrawZone()"></div>
+    <div class="insp-row"><label>Entry Y</label><input type="number" value="${t.toY}" onchange="_weIncomingList[${index}].t.toY=+this.value;_weIncomingDirty.add('${fromZone}');weRebuildInspector();weDrawZone()"></div>
+    <div class="insp-row"><label>Note</label><input type="text" placeholder="optional note…" value="${t.note||''}" onchange="_weIncomingList[${index}].t.note=this.value||undefined;_weIncomingDirty.add('${fromZone}');weRebuildInspector();weDrawZone()"></div>
+    <div style="display:flex;gap:4px;margin-top:6px">
+      <button onclick="weSaveIncoming('${fromZone}')" style="flex:1;background:${isDirty?'#1a7a38':'#21262d'};border:1px solid ${isDirty?'#3fb950':'#30363d'};color:#fff;padding:4px 0;border-radius:4px;cursor:pointer;font-size:11px">${isDirty?'● Save':'✓ Saved'}</button>
+      <button onclick="weLoadZone('${fromZone}')" class="goto-btn" style="flex:1;padding:4px 0">Open ${fromZone} →</button>
+    </div>`;
+
+  } else if (type === 'spawn') {
+    const s = weZoneData.spawns[index];
+    const r = s.rect || {};
+    h = `<div class="insp-sec">Spawn: ${s.enemyId||s.id}</div>
+    <div class="insp-row"><label>Rect X</label><input type="number" value="${r.x??0}" onchange="weZoneData.spawns[${index}].rect.x=+this.value;weDirty=true;weDrawZone()"></div>
+    <div class="insp-row"><label>Rect Y</label><input type="number" value="${r.y??0}" onchange="weZoneData.spawns[${index}].rect.y=+this.value;weDirty=true;weDrawZone()"></div>
+    <div class="insp-row"><label>Width</label><input type="number" value="${r.w??64}" onchange="weZoneData.spawns[${index}].rect.w=+this.value;weDirty=true;weDrawZone()"></div>
+    <div class="insp-row"><label>Height</label><input type="number" value="${r.h??64}" onchange="weZoneData.spawns[${index}].rect.h=+this.value;weDirty=true;weDrawZone()"></div>
+    <div class="insp-row"><label>Max Count</label><input type="number" value="${s.maxCount||s.count||1}" onchange="weZoneData.spawns[${index}].maxCount=+this.value;weDirty=true"></div>
+    <div class="insp-row"><label>Respawn (s)</label><input type="number" value="${s.respawnTime||30}" onchange="weZoneData.spawns[${index}].respawnTime=+this.value;weDirty=true"></div>
+    <div class="insp-sec" style="margin-top:6px;font-size:10px;color:#f0b429">▸ Rare / Boss</div>
+    <div class="insp-row"><label>Rare ID</label><input list="dev-enemy-ids" value="${s.rareId||''}" placeholder="e.g. goblin_brute" onchange="weZoneData.spawns[${index}].rareId=this.value||undefined;weDirty=true"></div>
+    <div class="insp-row"><label>Rare %</label><input type="number" min="0" max="100" step="1" value="${Math.round((s.rareChance??0)*100)}" onchange="weZoneData.spawns[${index}].rareChance=+this.value/100;weDirty=true"></div>
+    <div class="insp-row"><label>Is Boss</label><input type="checkbox" ${s.isBoss?'checked':''} onchange="weZoneData.spawns[${index}].isBoss=this.checked;weDirty=true;weDrawZone()"></div>
+    <div class="insp-row" title="0 = never respawns this session after killed"><label>Boss CD (s)</label><input type="number" min="0" value="${s.globalCooldown??0}" onchange="weZoneData.spawns[${index}].globalCooldown=+this.value;weDirty=true"></div>`;
+  }
+
+  if (weSelOv && weSelOv.type !== 'spawnPt' && weSelOv.type !== 'incoming') {
+    h += `<div style="display:flex;gap:4px;margin-top:8px">
+      <button onclick="weDuplicateOv()" style="flex:1;background:#1f6feb;border:none;color:#fff;padding:4px 0;border-radius:4px;cursor:pointer;font-size:11px">⧉ Duplicate</button>
+      <button onclick="weDeleteOv()" style="flex:1;background:#8b0000;border:none;color:#fff;padding:4px 0;border-radius:4px;cursor:pointer;font-size:11px">✕ Delete</button>
+    </div>`;
+  }
+
+  detail.innerHTML = h;
+  el.appendChild(detail);
+}
+
+// ── Canvas rendering ───────────────────────────────────────────────────────────
+function weDrawZone() {
+  const canvas = document.getElementById('we-canvas');
+  if (!weZoneData) { canvas.width=0; canvas.height=0; return; }
+  const { width, height, tileSize, layers } = weZoneData;
+  const Z = weZoom, TS2 = tileSize * Z;
+  canvas.width = width * TS2;
+  canvas.height = height * TS2;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (const layerName of ['ground','objects','roof']) {
+    const layer = layers.find(l => l.name === layerName);
+    if (!layer) continue;
+    ctx.globalAlpha = layerName === 'roof' ? 0.55 : 1;
+    for (let ty = 0; ty < height; ty++) {
+      for (let tx = 0; tx < width; tx++) {
+        const id = layer.data[ty * width + tx];
+        if (!id) continue;
+        const dx = tx * TS2, dy = ty * TS2;
+        const ki = tileMap[id];
+        if (ki != null && sheetImg) {
+          ctx.drawImage(sheetImg, (ki%sheetCols)*STRIDE, Math.floor(ki/sheetCols)*STRIDE, tileSize, tileSize, dx, dy, TS2, TS2);
+        } else {
+          ctx.fillStyle = TILE_COLORS[id] || '#f0f';
+          ctx.fillRect(dx, dy, TS2, TS2);
+        }
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  if (weMode === 'tiles') {
+    const curLayer = layers.find(l => l.name === weCurLayer);
+    if (curLayer && weCurLayer !== 'ground') {
+      ctx.strokeStyle = 'rgba(88,166,255,0.25)'; ctx.lineWidth = 1;
+      for (let ty = 0; ty < height; ty++)
+        for (let tx = 0; tx < width; tx++)
+          if (curLayer.data[ty*width+tx]) ctx.strokeRect(tx*TS2+0.5, ty*TS2+0.5, TS2-1, TS2-1);
+    }
+  }
+
+  if (weGrid && weZoom >= 2) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1;
+    for (let tx2 = 0; tx2 <= width; tx2++)  { ctx.beginPath(); ctx.moveTo(tx2*TS2,0); ctx.lineTo(tx2*TS2,height*TS2); ctx.stroke(); }
+    for (let ty2 = 0; ty2 <= height; ty2++) { ctx.beginPath(); ctx.moveTo(0,ty2*TS2); ctx.lineTo(width*TS2,ty2*TS2); ctx.stroke(); }
+  }
+
+  // Overlay rendering
+  if (weMode === 'overlays') weDrawOverlays(ctx, TS2);
+  // Copy/paste overlay (tiles mode)
+  if (weMode === 'tiles') weDrawCopyOverlay(ctx);
+
+  document.getElementById('we-zl').textContent = Z + '×';
+}
+
+function weDrawOverlays(ctx, TS2) {
+  const { transitions=[], npcs=[], spawns=[], spawnPoint } = weZoneData;
+  ctx.font = `${Math.max(9, TS2/2)}px monospace`;
+  ctx.textAlign = 'center';
+
+  // Player spawn point — purple star
+  if (spawnPoint) {
+    const sx = spawnPoint.x * weZoom, sy = spawnPoint.y * weZoom;
+    const sel = weSelOv?.type === 'spawnPt';
+    ctx.fillStyle = sel ? '#d29922' : OV_CLR.spawnPt;
+    ctx.globalAlpha = 0.9;
+    ctx.fillRect(sx - 4, sy - 4, 8, 8);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#fff';
+    ctx.fillText('P', sx, sy + 4);
+  }
+
+  // Transitions — gold rect with label
+  transitions.forEach((t, i) => {
+    const sel = weSelOv?.type === 'transition' && weSelOv.index === i;
+    const rx = t.rect.x * weZoom, ry = t.rect.y * weZoom;
+    const rw = t.rect.w * weZoom, rh = t.rect.h * weZoom;
+    ctx.fillStyle = OV_CLR.transition;
+    ctx.globalAlpha = sel ? 0.5 : 0.25;
+    ctx.fillRect(rx, ry, rw, rh);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = sel ? '#fff' : OV_CLR.transition;
+    ctx.lineWidth = sel ? 2 : 1;
+    ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
+    ctx.fillStyle = OV_CLR.transition;
+    const noteSnip = t.note ? ` · "${t.note.length > 12 ? t.note.slice(0, 12) + '…' : t.note}"` : '';
+    ctx.fillText('→' + t.toZone.replace(/_/g,' ') + noteSnip, rx + rw/2, ry - 2);
+    if (sel) weDrawHandles(ctx, t.rect);
+  });
+
+  // NPCs — green dot with id
+  npcs.forEach((n, i) => {
+    const sel = weSelOv?.type === 'npc' && weSelOv.index === i;
+    const nx = n.x * weZoom, ny = n.y * weZoom;
+    ctx.fillStyle = OV_CLR.npc;
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.arc(nx, ny, sel ? 7 : 5, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(n.id.split('_').pop(), nx, ny - 8);
+  });
+
+  // Enemy spawns — red rect region
+  spawns.forEach((s, i) => {
+    if (!s.rect) return;
+    const sel = weSelOv?.type === 'spawn' && weSelOv.index === i;
+    const rx = s.rect.x * weZoom, ry = s.rect.y * weZoom;
+    const rw = s.rect.w * weZoom, rh = s.rect.h * weZoom;
+    ctx.fillStyle = OV_CLR.spawn;
+    ctx.globalAlpha = sel ? 0.4 : 0.2;
+    ctx.fillRect(rx, ry, rw, rh);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = sel ? '#fff' : OV_CLR.spawn;
+    ctx.lineWidth = sel ? 2 : 1;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1);
+    ctx.setLineDash([]);
+    ctx.fillStyle = s.isBoss ? '#ff4444' : s.rareId ? '#f0b429' : OV_CLR.spawn;
+    const icon = s.isBoss ? '☠' : s.rareId ? '★' : '✦';
+    ctx.fillText(icon + ' ' + (s.enemyId||s.id||'?').split('_').pop() + ' ×' + (s.maxCount||1), rx + rw/2, ry + rh/2 + 4);
+    if (sel) weDrawHandles(ctx, s.rect);
+  });
+
+  // Incoming arrival points — blue squares at toX, toY
+  _weIncomingList.forEach(({ t, fromZone }, i) => {
+    const sel = weSelOv?.type === 'incoming' && weSelOv.index === i;
+    const ax = t.toX * weZoom, ay = t.toY * weZoom;
+    ctx.fillStyle = OV_CLR.incoming;
+    ctx.globalAlpha = sel ? 0.45 : 0.2;
+    ctx.fillRect(ax, ay, TS2, TS2);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = sel ? '#fff' : OV_CLR.incoming;
+    ctx.lineWidth = sel ? 2 : 1.5;
+    ctx.setLineDash(sel ? [] : [4, 3]);
+    ctx.strokeRect(ax + 0.5, ay + 0.5, TS2 - 1, TS2 - 1);
+    ctx.setLineDash([]);
+    ctx.fillStyle = OV_CLR.incoming;
+    ctx.textAlign = 'center';
+    ctx.fillText('← ' + fromZone.replace(/_/g, ' '), ax + TS2 / 2, ay - 3);
+    ctx.textAlign = 'left';
+    if (sel) {
+      // Move handle at centre
+      const cx = ax + TS2/2, cy = ay + TS2/2;
+      ctx.fillStyle = '#fff'; ctx.fillRect(cx - 4, cy - 4, 8, 8);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.strokeRect(cx - 4, cy - 4, 8, 8);
+    }
+  });
+
+  // Draw-spawn preview
+  if (weDrawingSpawn?.active && weDrawingSpawn.wx1 !== undefined) {
+    const ds = weDrawingSpawn;
+    const px = Math.min(ds.wx0, ds.wx1) * weZoom, py = Math.min(ds.wy0, ds.wy1) * weZoom;
+    const pw = Math.abs(ds.wx1 - ds.wx0) * weZoom, ph = Math.abs(ds.wy1 - ds.wy0) * weZoom;
+    ctx.fillStyle = OV_CLR.spawn; ctx.globalAlpha = 0.35;
+    ctx.fillRect(px, py, pw, ph); ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.setLineDash([4,3]);
+    ctx.strokeRect(px+0.5, py+0.5, pw-1, ph-1); ctx.setLineDash([]);
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+    ctx.fillText(ds.enemyId, px + pw/2, py + ph/2 + 4);
+    ctx.textAlign = 'left';
+  }
+
+  // Draw-transition preview
+  if (_weDrawingTrans?.active && _weDrawingTrans.wx1 !== undefined) {
+    const dt = _weDrawingTrans;
+    const px = Math.min(dt.wx0, dt.wx1) * weZoom, py = Math.min(dt.wy0, dt.wy1) * weZoom;
+    const pw = Math.abs(dt.wx1 - dt.wx0) * weZoom, ph = Math.abs(dt.wy1 - dt.wy0) * weZoom;
+    ctx.fillStyle = OV_CLR.transition; ctx.globalAlpha = 0.35;
+    ctx.fillRect(px, py, pw, ph); ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.setLineDash([4,3]);
+    ctx.strokeRect(px+0.5, py+0.5, pw-1, ph-1); ctx.setLineDash([]);
+    ctx.fillStyle = OV_CLR.transition; ctx.textAlign = 'center';
+    ctx.fillText('→ ' + dt.toZone.replace(/_/g,' '), px + pw/2, py + ph/2 + 4);
+    ctx.textAlign = 'left';
+  }
+
+  ctx.textAlign = 'left';
+}
+
+// Draw 8 resize handles for a world-coord rect
+function weDrawHandles(ctx, r) {
+  const HS = 5;
+  const pts = [
+    [r.x*weZoom, r.y*weZoom],       [(r.x+r.w/2)*weZoom, r.y*weZoom],       [(r.x+r.w)*weZoom, r.y*weZoom],
+    [r.x*weZoom, (r.y+r.h/2)*weZoom],                                          [(r.x+r.w)*weZoom, (r.y+r.h/2)*weZoom],
+    [r.x*weZoom, (r.y+r.h)*weZoom], [(r.x+r.w/2)*weZoom, (r.y+r.h)*weZoom], [(r.x+r.w)*weZoom, (r.y+r.h)*weZoom],
+  ];
+  ctx.setLineDash([]);
+  pts.forEach(([hx, hy]) => {
+    ctx.fillStyle = '#fff'; ctx.fillRect(hx-HS, hy-HS, HS*2, HS*2);
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.strokeRect(hx-HS, hy-HS, HS*2, HS*2);
+  });
+}
+
+// ── Pixel coords from mouse event ─────────────────────────────────────────────
+function weCanvasCoords(e) {
+  const rect = document.getElementById('we-canvas').getBoundingClientRect();
+  return { wx: (e.clientX - rect.left) / weZoom, wy: (e.clientY - rect.top) / weZoom };
+}
+
+// ── Hit testing overlays ──────────────────────────────────────────────────────
+function weHitOverlay(wx, wy) {
+  if (!weZoneData) return null;
+  const { transitions=[], npcs=[], spawns=[], spawnPoint } = weZoneData;
+  const HIT = 10; // px world-space hit radius
+
+  // Transitions — check rect
+  for (let i = transitions.length-1; i >= 0; i--) {
+    const t = transitions[i];
+    if (wx >= t.rect.x && wx <= t.rect.x + t.rect.w && wy >= t.rect.y && wy <= t.rect.y + t.rect.h)
+      return { type:'transition', index:i };
+  }
+  // NPCs
+  for (let i = npcs.length-1; i >= 0; i--) {
+    if (Math.abs(wx - npcs[i].x) < HIT && Math.abs(wy - npcs[i].y) < HIT)
+      return { type:'npc', index:i };
+  }
+  // Spawns (rect-based)
+  for (let i = spawns.length-1; i >= 0; i--) {
+    const r = spawns[i].rect;
+    if (r && wx >= r.x && wx <= r.x + r.w && wy >= r.y && wy <= r.y + r.h)
+      return { type:'spawn', index:i };
+  }
+  // Spawn point
+  if (spawnPoint && Math.abs(wx - spawnPoint.x) < HIT && Math.abs(wy - spawnPoint.y) < HIT)
+    return { type:'spawnPt', index:0 };
+  // Incoming arrival points — tile-sized square at toX, toY
+  const ts = weZoneData.tileSize ?? 16;
+  for (let i = _weIncomingList.length - 1; i >= 0; i--) {
+    const { t } = _weIncomingList[i];
+    if (wx >= t.toX && wx <= t.toX + ts && wy >= t.toY && wy <= t.toY + ts)
+      return { type:'incoming', index:i };
+  }
+  return null;
+}
+
+// ── Tile painting ──────────────────────────────────────────────────────────────
+function wePaintAt(e) {
+  if (!weZoneData || !wePainting) return;
+  const rect = document.getElementById('we-canvas').getBoundingClientRect();
+  const { width, height, tileSize } = weZoneData;
+  const TS2 = tileSize * weZoom;
+  const tx = Math.floor((e.clientX - rect.left) / TS2);
+  const ty = Math.floor((e.clientY - rect.top)  / TS2);
+  if (tx < 0 || ty < 0 || tx >= width || ty >= height) return;
+  const layer = weZoneData.layers.find(l => l.name === weCurLayer);
+  if (!layer) return;
+  const idx = ty * width + tx;
+  if (layer.data[idx] === wePaintTile) return;
+  layer.data[idx] = wePaintTile;
+  weDirty = true;
+  weDrawZone();
+}
+
+// ── Tile copy / paste ─────────────────────────────────────────────────────────
+function weTileCoords(e) {
+  const rect = weCanvas.getBoundingClientRect();
+  const TS2 = (weZoneData?.tileSize ?? 16) * weZoom;
+  return {
+    tx: Math.floor((e.clientX - rect.left)  / TS2),
+    ty: Math.floor((e.clientY - rect.top)   / TS2),
+  };
+}
+
+function weCommitCopy() {
+  if (!_weCopyDrawing || !weZoneData) return;
+  const { tx0, ty0, tx1, ty1 } = _weCopyDrawing;
+  const x0 = Math.min(tx0, tx1), y0 = Math.min(ty0, ty1);
+  const x1 = Math.max(tx0, tx1), y1 = Math.max(ty0, ty1);
+  const cw = x1 - x0 + 1, ch = y1 - y0 + 1;
+  const { width } = weZoneData;
+  const layers = {};
+  for (const layer of weZoneData.layers) {
+    const d = [];
+    for (let row = y0; row <= y1; row++)
+      for (let col = x0; col <= x1; col++)
+        d.push(layer.data[row * width + col] ?? 0);
+    layers[layer.name] = d;
+  }
+  _weClipboard = { w: cw, h: ch, layers };
+  _weCopyDrawing = null;
+  _wePasting = true;
+  weCanvas.style.cursor = 'copy';
+  document.getElementById('we-hint').textContent = 'Paste: click to stamp · Escape or RClick to cancel';
+  weDrawZone();
+}
+
+function weStampPaste(tx, ty) {
+  if (!_weClipboard || !weZoneData) return;
+  const { w, h, layers } = _weClipboard;
+  const { width, height } = weZoneData;
+  for (const layer of weZoneData.layers) {
+    const src = layers[layer.name];
+    if (!src) continue;
+    for (let row = 0; row < h; row++)
+      for (let col = 0; col < w; col++) {
+        const dx = tx + col, dy = ty + row;
+        if (dx < 0 || dy < 0 || dx >= width || dy >= height) continue;
+        layer.data[dy * width + dx] = src[row * w + col];
+      }
+  }
+  weDirty = true;
+  weDrawZone();
+}
+
+function weCancelCopyPaste() {
+  _weCopyDrawing = null;
+  _wePasting = false;
+  weCanvas.style.cursor = 'crosshair';
+  document.getElementById('we-hint').textContent = 'LClick paint · RClick erase · C copy rect · V paste · MMB pan';
+  weDrawZone();
+}
+
+function weDrawCopyOverlay(ctx) {
+  if (!weZoneData) return;
+  const TS2 = (weZoneData.tileSize ?? 16) * weZoom;
+  // Draw selection while dragging C
+  if (_weCopyDrawing) {
+    const { tx0, ty0, tx1, ty1 } = _weCopyDrawing;
+    const x0 = Math.min(tx0, tx1), y0 = Math.min(ty0, ty1);
+    const x1 = Math.max(tx0, tx1), y1 = Math.max(ty0, ty1);
+    ctx.fillStyle = 'rgba(88,166,255,0.15)';
+    ctx.fillRect(x0 * TS2, y0 * TS2, (x1-x0+1) * TS2, (y1-y0+1) * TS2);
+    ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 2; ctx.setLineDash([4,3]);
+    ctx.strokeRect(x0 * TS2 + 1, y0 * TS2 + 1, (x1-x0+1) * TS2 - 2, (y1-y0+1) * TS2 - 2);
+    ctx.setLineDash([]);
+  }
+  // Draw paste preview — composite all layers in order
+  if (_wePasting && _weClipboard) {
+    const { w, h, layers } = _weClipboard;
+    const TS = weZoneData.tileSize ?? 16;
+    ctx.globalAlpha = 0.6;
+    for (const layerName of ['ground', 'objects', 'roof']) {
+      const srcLayer = layers[layerName];
+      if (!srcLayer) continue;
+      if (layerName === 'roof') ctx.globalAlpha = 0.35;
+      for (let row = 0; row < h; row++) {
+        for (let col = 0; col < w; col++) {
+          const tileId = srcLayer[row * w + col] ?? 0;
+          if (!tileId) continue;
+          const dx = (_wePasteTx + col) * TS2, dy = (_wePasteTy + row) * TS2;
+          const ki = tileMap[tileId];
+          if (ki != null && sheetImg) {
+            ctx.drawImage(sheetImg, (ki%sheetCols)*17, Math.floor(ki/sheetCols)*17, TS, TS, dx, dy, TS2, TS2);
+          } else {
+            ctx.fillStyle = TILE_COLORS[tileId] || '#f0f';
+            ctx.fillRect(dx, dy, TS2, TS2);
+          }
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.setLineDash([4,3]);
+    ctx.strokeRect(_wePasteTx * TS2 + 1, _wePasteTy * TS2 + 1, w * TS2 - 2, h * TS2 - 2);
+    ctx.setLineDash([]);
+  }
+}
+
+// ── Canvas event wiring ────────────────────────────────────────────────────────
+const weCanvas = document.getElementById('we-canvas');
+const weWrap   = document.getElementById('we-wrap');
+
+weCanvas.addEventListener('mousedown', e => {
+  e.preventDefault();
+
+  // Middle-click: start pan
+  if (e.button === 1) {
+    wePanStart = { mx: e.clientX, my: e.clientY, sl: weWrap.scrollLeft, st: weWrap.scrollTop };
+    weCanvas.style.cursor = 'grabbing';
+    return;
+  }
+
+  if (weMode === 'tiles') {
+    // Paste mode: left click stamps, right click cancels
+    if (_wePasting) {
+      if (e.button === 2) { weCancelCopyPaste(); return; }
+      const { tx, ty } = weTileCoords(e);
+      weStampPaste(tx, ty);
+      return;
+    }
+    // Copy-drag: left-mousedown starts selection rect
+    if (_weCopyDrawing) {
+      const { tx, ty } = weTileCoords(e);
+      _weCopyDrawing.tx0 = tx; _weCopyDrawing.ty0 = ty;
+      _weCopyDrawing.tx1 = tx; _weCopyDrawing.ty1 = ty;
+      return;
+    }
+    if (e.button === 2) { wePaintTile = 0; weBuildPalette(); }
+    wePainting = true;
+    wePaintAt(e);
+  } else {
+    const { wx, wy } = weCanvasCoords(e);
+
+    // Pending NPC placement: click to place
+    if (_weAddNpcId) {
+      if (!weZoneData.npcs) weZoneData.npcs = [];
+      weZoneData.npcs.push({ id: _weAddNpcId, x: Math.round(wx), y: Math.round(wy) });
+      weSelOv = { type: 'npc', index: weZoneData.npcs.length - 1 };
+      weDirty = true;
+      _weAddNpcId = null;
+      weCanvas.style.cursor = 'default';
+      document.getElementById('we-hint').textContent = 'Drag NPCs/transitions · Click to inspect · MMB pan';
+      weRebuildInspector();
+      weDrawZone();
+      return;
+    }
+
+    // Paint-new-spawn mode: begin drawing the rect
+    if (weDrawingSpawn) {
+      weDrawingSpawn.wx0 = wx; weDrawingSpawn.wy0 = wy;
+      weDrawingSpawn.wx1 = wx; weDrawingSpawn.wy1 = wy;
+      weDrawingSpawn.active = true;
+      return;
+    }
+
+    // Paint-new-transition mode: begin drawing the rect
+    if (_weDrawingTrans) {
+      _weDrawingTrans.wx0 = wx; _weDrawingTrans.wy0 = wy;
+      _weDrawingTrans.wx1 = wx; _weDrawingTrans.wy1 = wy;
+      _weDrawingTrans.active = true;
+      return;
+    }
+
+    // Check resize handles on selected rect overlay first
+    const hid = weHitHandle(wx, wy);
+    if (hid) {
+      const { type, index } = weSelOv;
+      const item = type === 'spawn' ? weZoneData.spawns[index] : weZoneData.transitions[index];
+      weDragging = { type, index, wx0: wx, wy0: wy, origRect: { ...item.rect }, resizeHandle: hid };
+      return;
+    }
+
+    // Overlay mode: interior hit test → move drag
+    const hit = weHitOverlay(wx, wy);
+    if (hit) {
+      wePickOv(hit.type, hit.index);
+      let origX, origY;
+      if (hit.type === 'incoming') {
+        const { t } = _weIncomingList[hit.index];
+        origX = t.toX; origY = t.toY;
+      } else {
+        const item = hit.type === 'spawnPt'    ? weZoneData.spawnPoint
+                   : hit.type === 'transition' ? weZoneData.transitions[hit.index]
+                   : hit.type === 'npc'        ? weZoneData.npcs[hit.index]
+                   : weZoneData.spawns[hit.index];
+        const usesRect = hit.type === 'transition' || hit.type === 'spawn';
+        origX = usesRect ? item.rect.x : item.x;
+        origY = usesRect ? item.rect.y : item.y;
+      }
+      weDragging = { ...hit, wx0: wx, wy0: wy, resizeHandle: null, origX, origY };
+    } else {
+      weSelOv = null;
+      weRebuildInspector();
+      weDrawZone();
+    }
+  }
+});
+
+weCanvas.addEventListener('mousemove', e => {
+  // MMB pan
+  if (wePanStart) {
+    weWrap.scrollLeft = wePanStart.sl - (e.clientX - wePanStart.mx);
+    weWrap.scrollTop  = wePanStart.st - (e.clientY - wePanStart.my);
+    return;
+  }
+
+  // Coords display
+  if (weZoneData) {
+    const { wx, wy } = weCanvasCoords(e);
+    const co = document.getElementById('we-coords');
+    co.style.display = 'block';
+    const tx = Math.floor(wx / weZoneData.tileSize), ty = Math.floor(wy / weZoneData.tileSize);
+    co.textContent = `tile ${tx},${ty}  px ${Math.round(wx)},${Math.round(wy)}`;
+  }
+
+  if (weMode === 'tiles') {
+    if (_wePasting || _weCopyDrawing) {
+      const { tx, ty } = weTileCoords(e);
+      if (_wePasting) { _wePasteTx = tx; _wePasteTy = ty; weDrawZone(); return; }
+      if (_weCopyDrawing) { _weCopyDrawing.tx1 = tx; _weCopyDrawing.ty1 = ty; weDrawZone(); return; }
+    }
+    wePaintAt(e);
+  } else if (weDragging) {
+    const { wx, wy } = weCanvasCoords(e);
+    const { type, index, resizeHandle } = weDragging;
+    const snap = weZoneData.tileSize;
+
+    if (resizeHandle) {
+      // Resize mode: adjust rect edges based on which handle is grabbed
+      const item = type === 'spawn' ? weZoneData.spawns[index] : weZoneData.transitions[index];
+      const r = item.rect;
+      const dx = wx - weDragging.wx0, dy = wy - weDragging.wy0;
+      const o = weDragging.origRect;
+      let nx = o.x, ny = o.y, nw = o.w, nh = o.h;
+      if (resizeHandle.includes('L')) { nx = Math.round((o.x+dx)/snap)*snap; nw = o.w - (nx - o.x); }
+      if (resizeHandle.includes('R')) { nw = Math.round((o.w+dx)/snap)*snap; }
+      if (resizeHandle.includes('T')) { ny = Math.round((o.y+dy)/snap)*snap; nh = o.h - (ny - o.y); }
+      if (resizeHandle.includes('B')) { nh = Math.round((o.h+dy)/snap)*snap; }
+      r.x = nx; r.y = ny;
+      r.w = Math.max(snap, nw); r.h = Math.max(snap, nh);
+    } else {
+      // Move mode
+      const dx = wx - weDragging.wx0, dy = wy - weDragging.wy0;
+      const nx = Math.round((weDragging.origX + dx) / snap) * snap;
+      const ny = Math.round((weDragging.origY + dy) / snap) * snap;
+      if (type === 'spawnPt') {
+        weZoneData.spawnPoint.x = nx; weZoneData.spawnPoint.y = ny;
+      } else if (type === 'transition') {
+        weZoneData.transitions[index].rect.x = nx; weZoneData.transitions[index].rect.y = ny;
+      } else if (type === 'npc') {
+        weZoneData.npcs[index].x = nx; weZoneData.npcs[index].y = ny;
+      } else if (type === 'spawn') {
+        weZoneData.spawns[index].rect.x = nx; weZoneData.spawns[index].rect.y = ny;
+      } else if (type === 'incoming') {
+        const { t, fromZone } = _weIncomingList[index];
+        t.toX = nx; t.toY = ny;
+        _weIncomingDirty.add(fromZone);
+        weRebuildInspector();
+      }
+    }
+    weDirty = type !== 'incoming';
+    weDrawZone();
+    weShowOvDetail();
+  } else if (weDrawingSpawn?.active) {
+    // Update draw-spawn preview
+    const { wx, wy } = weCanvasCoords(e);
+    weDrawingSpawn.wx1 = wx; weDrawingSpawn.wy1 = wy;
+    weDrawZone();
+  } else if (_weDrawingTrans?.active) {
+    const { wx, wy } = weCanvasCoords(e);
+    _weDrawingTrans.wx1 = wx; _weDrawingTrans.wy1 = wy;
+    weDrawZone();
+  } else {
+    // Cursor: resize handle > move > default
+    const { wx, wy } = weCanvasCoords(e);
+    const hid = weHitHandle(wx, wy);
+    if (hid) weCanvas.style.cursor = HANDLE_CURSORS[hid];
+    else weCanvas.style.cursor = weHitOverlay(wx, wy) ? 'move' : 'default';
+  }
+});
+
+weCanvas.addEventListener('mouseup', e => {
+  if (wePanStart) { wePanStart = null; weCanvas.style.cursor = weMode === 'tiles' ? 'crosshair' : 'default'; return; }
+  // Finalize copy selection
+  if (_weCopyDrawing && weMode === 'tiles') { weCommitCopy(); return; }
+  wePainting = false;
+  if (weDragging) { weDragging = null; weRebuildInspector(); return; }
+  // Finalize new transition rect
+  if (_weDrawingTrans?.active && _weDrawingTrans.wx1 !== undefined) {
+    const dt = _weDrawingTrans;
+    const snap = weZoneData.tileSize;
+    const rx = Math.round(Math.min(dt.wx0, dt.wx1) / snap) * snap;
+    const ry = Math.round(Math.min(dt.wy0, dt.wy1) / snap) * snap;
+    const rw = Math.max(snap, Math.round(Math.abs(dt.wx1 - dt.wx0) / snap) * snap);
+    const rh = Math.max(snap, Math.round(Math.abs(dt.wy1 - dt.wy0) / snap) * snap);
+    if (!weZoneData.transitions) weZoneData.transitions = [];
+    weZoneData.transitions.push({ id: dt.id, toZone: dt.toZone, rect: { x:rx, y:ry, w:rw, h:rh }, toX: 0, toY: 0 });
+    weSelOv = { type:'transition', index: weZoneData.transitions.length - 1 };
+    weDirty = true;
+    _weDrawingTrans = null;
+    weCanvas.style.cursor = 'default';
+    document.getElementById('we-hint').textContent = 'Drag NPCs/transitions · Click to inspect · MMB pan';
+    weRebuildInspector();
+    weDrawZone();
+    return;
+  }
+
+  // Finalize new spawn rect
+  if (weDrawingSpawn?.active && weDrawingSpawn.wx1 !== undefined) {
+    const ds = weDrawingSpawn;
+    const snap = weZoneData.tileSize;
+    const rx = Math.round(Math.min(ds.wx0, ds.wx1) / snap) * snap;
+    const ry = Math.round(Math.min(ds.wy0, ds.wy1) / snap) * snap;
+    const rw = Math.max(snap, Math.round(Math.abs(ds.wx1 - ds.wx0) / snap) * snap);
+    const rh = Math.max(snap, Math.round(Math.abs(ds.wy1 - ds.wy0) / snap) * snap);
+    const newSpawn = {
+      id: ds.enemyId + '_spawn_' + Date.now(),
+      enemyId: ds.enemyId,
+      rect: { x:rx, y:ry, w:rw, h:rh },
+      maxCount: 1,
+      respawnTime: 30,
+    };
+    if (!weZoneData.spawns) weZoneData.spawns = [];
+    weZoneData.spawns.push(newSpawn);
+    weSelOv = { type:'spawn', index: weZoneData.spawns.length - 1 };
+    weDirty = true;
+    weDrawingSpawn = null;
+    weCanvas.style.cursor = 'default';
+    document.getElementById('we-hint').textContent = 'Drag NPCs/transitions · Click to inspect · MMB pan';
+    weRebuildInspector();
+  }
+});
+
+weCanvas.addEventListener('mouseleave', () => {
+  wePainting = false; wePanStart = null;
+  document.getElementById('we-coords').style.display = 'none';
+});
+weCanvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// Keyboard shortcuts for world editor
+document.addEventListener('keydown', e => {
+  // Don't fire if typing in an input
+  if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+
+  // C — start copy selection (tiles mode only)
+  if (e.key === 'c' || e.key === 'C') {
+    if (weMode === 'tiles' && weZoneData && !_wePasting) {
+      _weCopyDrawing = { tx0: 0, ty0: 0, tx1: 0, ty1: 0 };
+      _wePasting = false;
+      weCanvas.style.cursor = 'crosshair';
+      document.getElementById('we-hint').textContent = 'Drag to select copy region…';
+      return;
+    }
+  }
+  // V — activate paste (tiles mode, clipboard must exist)
+  if (e.key === 'v' || e.key === 'V') {
+    if (weMode === 'tiles' && _weClipboard && !_weCopyDrawing) {
+      _wePasting = true;
+      weCanvas.style.cursor = 'copy';
+      document.getElementById('we-hint').textContent = 'Paste: click to stamp · Escape or RClick to cancel';
+      weDrawZone();
+      return;
+    }
+  }
+  // Escape — cancel copy/paste, draw-spawn, draw-transition, add-NPC
+  if (e.key === 'Escape') {
+    if (_weCopyDrawing || _wePasting) { weCancelCopyPaste(); return; }
+    if (weDrawingSpawn) {
+      weDrawingSpawn = null;
+      weCanvas.style.cursor = 'default';
+      document.getElementById('we-hint').textContent = 'Drag NPCs/transitions · Click to inspect · MMB pan';
+      weDrawZone();
+    }
+    if (_weDrawingTrans) {
+      _weDrawingTrans = null;
+      weCanvas.style.cursor = 'default';
+      document.getElementById('we-hint').textContent = 'Drag NPCs/transitions · Click to inspect · MMB pan';
+      weDrawZone();
+    }
+    if (_weAddNpcId) {
+      _weAddNpcId = null;
+      weCanvas.style.cursor = 'default';
+      document.getElementById('we-hint').textContent = 'Drag NPCs/transitions · Click to inspect · MMB pan';
+    }
+  }
+});
+
+// Also support MMB pan on the wrap div during pan
+weWrap.addEventListener('mousemove', e => {
+  if (!wePanStart) return;
+  weWrap.scrollLeft = wePanStart.sl - (e.clientX - wePanStart.mx);
+  weWrap.scrollTop  = wePanStart.st - (e.clientY - wePanStart.my);
+});
+weWrap.addEventListener('mouseup', () => {
+  if (wePanStart) { wePanStart = null; weCanvas.style.cursor = weMode === 'tiles' ? 'crosshair' : 'default'; }
+});
+
+async function weSaveZone() {
+  if (!weZoneData) { status('No zone loaded', 'err'); return; }
+  const id = document.getElementById('we-zone').value;
+  const d = await api('zone/' + id, 'POST', {
+    layers: weZoneData.layers,
+    transitions: weZoneData.transitions,
+    npcs: weZoneData.npcs,
+    spawns: weZoneData.spawns,
+    spawnPoint: weZoneData.spawnPoint,
+  });
+  if (d.ok) { weDirty = false; status('✓ Saved: ' + id + '.js — refresh game to see changes', 'ok'); weLoadZoneLinks(); }
+  else status('Save failed: ' + d.error, 'err');
+}
+
+async function weResetZone() {
+  if (!weZoneData) { status('No zone loaded', 'err'); return; }
+  if (!confirm(`Reload "${weZoneData.id}" from disk? All unsaved changes will be lost.`)) return;
+  weDirty = false; // bypass dirty check in weLoadZone
+  await weLoadZone(weZoneData.id);
+  status('Zone reloaded from disk.', 'ok');
+}
+
+// ── Zone management ──────────────────────────────────────────────────────────
+function weZoneModalClose(id) { document.getElementById(id).style.display = 'none'; }
+
+function weOpenAddZone() {
+  document.getElementById('waz-id').value = '';
+  document.getElementById('waz-name').value = '';
+  document.getElementById('waz-w').value = '30';
+  document.getElementById('waz-h').value = '30';
+  document.getElementById('waz-err').style.display = 'none';
+  const m = document.getElementById('we-add-zone-modal');
+  m.style.display = 'flex';
+  setTimeout(() => document.getElementById('waz-id').focus(), 50);
+}
+
+async function weConfirmAddZone() {
+  const id   = document.getElementById('waz-id').value.trim();
+  const name = document.getElementById('waz-name').value.trim();
+  const w    = +document.getElementById('waz-w').value;
+  const h    = +document.getElementById('waz-h').value;
+  const err  = document.getElementById('waz-err');
+  if (!id) { err.textContent = 'Zone ID is required'; err.style.display = 'block'; return; }
+  if (!w || !h) { err.textContent = 'Width and height required'; err.style.display = 'block'; return; }
+  const d = await api('zone-new', 'POST', { id, name: name || id, width: w, height: h });
+  if (d.error) { err.textContent = d.error; err.style.display = 'block'; return; }
+  weZoneModalClose('we-add-zone-modal');
+  status(`✓ Created zone: ${id}.js`, 'ok');
+  await weLoadZoneList();
+  document.getElementById('we-zone').value = id;
+  await weLoadZone(id);
+}
+
+function weOpenCopyZone() {
+  if (!weZoneData) { status('Load a zone first', 'err'); return; }
+  document.getElementById('wcz-src-label').textContent = weZoneData.id;
+  document.getElementById('wcz-id').value = weZoneData.id + '_copy';
+  document.getElementById('wcz-name').value = (weZoneData.name || weZoneData.id) + ' Copy';
+  document.getElementById('wcz-err').style.display = 'none';
+  const m = document.getElementById('we-copy-zone-modal');
+  m.style.display = 'flex';
+  setTimeout(() => document.getElementById('wcz-id').focus(), 50);
+}
+
+async function weConfirmCopyZone() {
+  const srcId = weZoneData?.id;
+  const newId = document.getElementById('wcz-id').value.trim();
+  const name  = document.getElementById('wcz-name').value.trim();
+  const err   = document.getElementById('wcz-err');
+  if (!newId) { err.textContent = 'New zone ID required'; err.style.display = 'block'; return; }
+  const d = await api('zone-copy', 'POST', {
+    srcId, newId, newName: name || newId,
+    incLayers:      document.getElementById('wcz-layers').checked,
+    incSpawnPoint:  document.getElementById('wcz-sp').checked,
+    incSpawns:      document.getElementById('wcz-spawns').checked,
+    incTransitions: document.getElementById('wcz-trans').checked,
+    incNpcs:        document.getElementById('wcz-npcs').checked,
+  });
+  if (d.error) { err.textContent = d.error; err.style.display = 'block'; return; }
+  weZoneModalClose('we-copy-zone-modal');
+  status(`✓ Copied ${srcId} → ${newId}`, 'ok');
+  await weLoadZoneList();
+  document.getElementById('we-zone').value = newId;
+  await weLoadZone(newId);
+}
+
+function weOpenRenameZone() {
+  if (!weZoneData) { status('Load a zone first', 'err'); return; }
+  document.getElementById('wrz-id').value   = weZoneData.id;
+  document.getElementById('wrz-name').value = weZoneData.name || '';
+  document.getElementById('wrz-w').value    = weZoneData.width;
+  document.getElementById('wrz-h').value    = weZoneData.height;
+  document.getElementById('wrz-cur-w').textContent = `(current: ${weZoneData.width})`;
+  document.getElementById('wrz-cur-h').textContent = `(current: ${weZoneData.height})`;
+  document.getElementById('wrz-err').style.display = 'none';
+  const m = document.getElementById('we-rename-zone-modal');
+  m.style.display = 'flex';
+  setTimeout(() => document.getElementById('wrz-id').focus(), 50);
+}
+
+async function weConfirmRenameZone() {
+  const oldId   = weZoneData?.id;
+  const newId   = document.getElementById('wrz-id').value.trim() || oldId;
+  const newName = document.getElementById('wrz-name').value.trim() || undefined;
+  const newW    = +document.getElementById('wrz-w').value;
+  const newH    = +document.getElementById('wrz-h').value;
+  const err     = document.getElementById('wrz-err');
+  if (!newId) { err.textContent = 'Zone ID required'; err.style.display = 'block'; return; }
+  const d = await api('zone-rename', 'POST', { oldId, newId, newName, newWidth: newW, newHeight: newH });
+  if (d.error) { err.textContent = d.error; err.style.display = 'block'; return; }
+  weZoneModalClose('we-rename-zone-modal');
+  status(`✓ Zone updated: ${newId}`, 'ok');
+  await weLoadZoneList();
+  document.getElementById('we-zone').value = newId;
+  await weLoadZone(newId);
+  if (newId !== oldId) await weLoadZoneLinks(); // refresh incoming since toZone refs changed
+}
+
+// ────────────────────────────────────────────────────────
+// CHARACTERS
+// ────────────────────────────────────────────────────────
+let _charData        = [];                 // summary list from server
+let _charSortCol     = 'level';
+let _charSortDir     = -1;                 // -1 = desc
+let _charExpandedName = null;             // currently expanded row name
+let _charDetailData  = {};                 // name → full detail from server
+let _charDetailTab   = {};                 // name → active tab
+let _charModalTarget = null;              // name being operated on in modal
+
+async function charsLoad() {
+  try {
+    const res = await fetch('/dev/api/characters');
+    _charData = await res.json();
+    charsRender();
+    status('Characters loaded');
+  } catch(e) { status('Failed to load characters: ' + e.message, 'err'); }
+}
+
+function charsSort(col) {
+  if (_charSortCol === col) _charSortDir *= -1;
+  else { _charSortCol = col; _charSortDir = (col === 'level' || col === 'lastSeen' || col === 'gold') ? -1 : 1; }
+  charsRender();
+}
+
+function charsFilter() { charsRender(); }
+
+function charsRender() {
+  const q = (document.getElementById('chars-search')?.value ?? '').toLowerCase();
+  let rows = _charData.filter(c => !q || c.name.toLowerCase().includes(q));
+  const col = _charSortCol, dir = _charSortDir;
+  rows.sort((a, b) => {
+    const av = a[col] ?? '', bv = b[col] ?? '';
+    return typeof av === 'number' ? (av - bv) * dir : String(av).localeCompare(String(bv)) * dir;
+  });
+  const tbody = document.getElementById('chars-body');
+  const empty = document.getElementById('chars-empty');
+  if (!tbody) return;
+  if (rows.length === 0) { tbody.innerHTML = ''; empty.style.display = ''; return; }
+  empty.style.display = 'none';
+
+  let html = '';
+  for (const c of rows) {
+    const isExp = c.name === _charExpandedName;
+    const seenMins = Math.floor((Date.now() - (c.lastSeen ?? 0)) / 60000);
+    const seenAgo  = seenMins < 60 ? `${seenMins}m ago` : `${Math.floor(seenMins/60)}h ago`;
+    const creatMins = Math.floor((Date.now() - (c.createdAt ?? 0)) / 60000);
+    const creatAgo  = creatMins < 60 ? `${creatMins}m` : creatMins < 1440 ? `${Math.floor(creatMins/60)}h` : `${Math.floor(creatMins/1440)}d`;
+    html += `<tr style="border-bottom:1px solid #21262d;cursor:pointer;background:${isExp?'#161b22':'transparent'}" onclick="charToggle('${esc(c.name)}')">
+      <td style="padding:6px 8px;color:#e6edf3;font-weight:600;white-space:nowrap">${isExp?'▾':'▸'} ${esc(c.name)}</td>
+      <td style="padding:6px 8px;color:#f0b429">${c.level ?? 1}</td>
+      <td style="padding:6px 8px;color:#8b949e">${esc(c.lastZone ?? '?')}</td>
+      <td style="padding:6px 8px;color:#d29922">${(c.gold ?? 0).toLocaleString()}g</td>
+      <td style="padding:6px 8px;color:#8b949e">${seenAgo}</td>
+      <td style="padding:6px 8px;color:#555;font-size:11px">${creatAgo} ago</td>
+      <td style="padding:6px 8px" onclick="event.stopPropagation()">
+        <button class="btn" style="font-size:11px;padding:3px 8px" onclick="charRename('${esc(c.name)}')">Rename</button>
+        <button class="btn" style="font-size:11px;padding:3px 8px" onclick="charCopy('${esc(c.name)}')">Copy</button>
+        <button class="btn" style="font-size:11px;padding:3px 8px;color:#f85149;border-color:#4a1a1a" onclick="charsDelete('${esc(c.name)}')">Delete</button>
+      </td>
+    </tr>`;
+    if (isExp) {
+      html += `<tr id="char-detail-row"><td colspan="7" style="padding:0;background:#0d1117;border-bottom:2px solid #1f6feb">
+        ${_charDetailHtml(c.name)}
+      </td></tr>`;
+    }
+  }
+  tbody.innerHTML = html;
+}
+
+function charToggle(name) {
+  if (_charExpandedName === name) {
+    _charExpandedName = null;
+    charsRender();
+    return;
+  }
+  _charExpandedName = name;
+  charsRender();
+  if (!_charDetailData[name]) charLoadDetail(name);
+}
+
+async function charLoadDetail(name) {
+  try {
+    const res = await fetch(`/dev/api/characters/${encodeURIComponent(name)}`);
+    if (!res.ok) { status('Failed to load character detail', 'err'); return; }
+    _charDetailData[name] = await res.json();
+    if (!_charDetailTab[name]) _charDetailTab[name] = 'stats';
+    _charDetailRefresh(name);
+  } catch(e) { status('Error: ' + e.message, 'err'); }
+}
+
+function _charDetailRefresh(name) {
+  const row = document.getElementById('char-detail-row');
+  if (row) row.querySelector('td').innerHTML = _charDetailHtml(name);
+}
+
+function _charDetailHtml(name) {
+  const d = _charDetailData[name];
+  if (!d) return `<div style="padding:14px;color:#8b949e;font-size:12px">Loading…</div>`;
+
+  const tab = _charDetailTab[name] ?? 'stats';
+  const tabs = [['stats','Stats'],['equipment','Equipment'],['inventory','Inventory'],['quests','Quests']];
+  const tabBar = tabs.map(([t, label]) =>
+    `<button class="btn" style="font-size:11px;padding:3px 10px${tab===t?';background:#1f6feb;border-color:#1f6feb;color:#fff':''}" onclick="charTabSwitch('${esc(name)}','${t}');event.stopPropagation()">${label}</button>`
+  ).join('');
+
+  let content = '';
+  if      (tab === 'stats')     content = _charStatsHtml(name, d);
+  else if (tab === 'equipment') content = _charEquipHtml(name, d);
+  else if (tab === 'inventory') content = _charInvHtml(name, d);
+  else if (tab === 'quests')    content = _charQuestsHtml(name, d);
+
+  return `<div style="padding:10px 14px;font-size:12px" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="display:flex;gap:4px">${tabBar}</div>
+      <div style="margin-left:auto;display:flex;gap:4px">
+        <button class="btn" style="font-size:11px;padding:3px 8px" onclick="charChangePin('${esc(name)}')">🔑 Change PIN</button>
+        <button class="btn" style="font-size:11px;padding:3px 8px;color:#f85149;border-color:#4a1a1a" onclick="charsDelete('${esc(name)}')">🗑 Delete</button>
+      </div>
+    </div>
+    ${content}
+  </div>`;
+}
+
+function charTabSwitch(name, tab) {
+  _charDetailTab[name] = tab;
+  _charDetailRefresh(name);
+}
+
+// ── Stats tab ──────────────────────────────────────────────────────────────
+
+function _charStatsHtml(name, d) {
+  const bs = d.baseStats ?? {};
+  const stats = ['STR','DEX','INT','CON','WIS','CHA'];
+  const statInputs = stats.map(s => `
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label style="font-size:10px;color:#8b949e;letter-spacing:.5px">${s}</label>
+      <input id="cs-${name}-${s}" type="number" value="${bs[s]??0}" min="1" max="99"
+        style="width:52px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:4px 6px;border-radius:4px;font:inherit;font-size:12px">
+    </div>`).join('');
+
+  return `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;align-items:flex-end">
+    ${statInputs}
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label style="font-size:10px;color:#8b949e;letter-spacing:.5px">LEVEL</label>
+      <input id="cs-${name}-level" type="number" value="${d.level??1}" min="1" max="99"
+        style="width:52px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:4px 6px;border-radius:4px;font:inherit;font-size:12px">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label style="font-size:10px;color:#8b949e;letter-spacing:.5px">XP</label>
+      <input id="cs-${name}-xp" type="number" value="${d.xp??0}" min="0"
+        style="width:72px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:4px 6px;border-radius:4px;font:inherit;font-size:12px">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label style="font-size:10px;color:#8b949e;letter-spacing:.5px">GOLD</label>
+      <input id="cs-${name}-gold" type="number" value="${d.gold??0}" min="0"
+        style="width:72px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:4px 6px;border-radius:4px;font:inherit;font-size:12px">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label style="font-size:10px;color:#8b949e;letter-spacing:.5px">LAST ZONE</label>
+      <input id="cs-${name}-lastZone" type="text" value="${esc(d.lastZone??'ashenvale')}"
+        style="width:110px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:4px 6px;border-radius:4px;font:inherit;font-size:12px">
+    </div>
+    <button class="btn primary" style="font-size:11px;padding:4px 14px;align-self:flex-end" onclick="charSaveStats('${esc(name)}')">Save Stats</button>
+  </div>`;
+}
+
+async function charSaveStats(name) {
+  const d = _charDetailData[name];
+  if (!d) return;
+  const baseStats = {};
+  for (const s of ['STR','DEX','INT','CON','WIS','CHA']) {
+    const v = parseInt(document.getElementById(`cs-${name}-${s}`)?.value ?? 0);
+    if (!isNaN(v)) baseStats[s] = v;
+  }
+  const level    = parseInt(document.getElementById(`cs-${name}-level`)?.value ?? 1);
+  const xp       = parseInt(document.getElementById(`cs-${name}-xp`)?.value ?? 0);
+  const gold     = parseInt(document.getElementById(`cs-${name}-gold`)?.value ?? 0);
+  const lastZone = document.getElementById(`cs-${name}-lastZone`)?.value?.trim() ?? 'ashenvale';
+  try {
+    const j = await api(`characters/${encodeURIComponent(name)}/save`, 'POST', { baseStats, level, xp, gold, lastZone });
+    if (j.ok) {
+      Object.assign(d, { baseStats, level, xp, gold, lastZone });
+      const sc = _charData.find(c => c.name === name);
+      if (sc) { sc.level = level; sc.gold = gold; sc.lastZone = lastZone; }
+      status(`✓ Stats saved for ${name}`);
+    } else status(j.error ?? 'Save failed', 'err');
+  } catch(e) { status('Error: ' + e.message, 'err'); }
+}
+
+// ── Equipment tab ──────────────────────────────────────────────────────────
+
+function _charEquipHtml(name, d) {
+  const eq = d.equipment ?? {};
+  const slots = ['mainhand','offhand','head','chest','legs','feet','ring','accessory'];
+  const rows = slots.map(slot => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+      <span style="color:#8b949e;font-size:11px;width:78px;flex-shrink:0;text-align:right">${slot}</span>
+      <input id="ceq-${name}-${slot}" type="text" value="${esc(eq[slot]??'')}" placeholder="item ID…"
+        style="flex:1;max-width:180px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:4px 8px;border-radius:4px;font:inherit;font-size:12px">
+      <button class="btn" style="font-size:11px;padding:2px 7px" onclick="openItemPicker(id=>{document.getElementById('ceq-${name}-${slot}').value=id;},'${slot}')">⋯</button>
+      <button class="btn" style="font-size:11px;padding:2px 7px;color:#8b949e" onclick="document.getElementById('ceq-${name}-${slot}').value=''">×</button>
+    </div>`).join('');
+  return `<div>${rows}</div>
+    <button class="btn primary" style="font-size:11px;padding:4px 14px;margin-top:6px" onclick="charSaveEquip('${esc(name)}')">Save Equipment</button>`;
+}
+
+async function charSaveEquip(name) {
+  const equipment = {};
+  for (const slot of ['mainhand','offhand','head','chest','legs','feet','ring','accessory']) {
+    const val = document.getElementById(`ceq-${name}-${slot}`)?.value?.trim();
+    if (val) equipment[slot] = val;
+  }
+  try {
+    const j = await api(`characters/${encodeURIComponent(name)}/save`, 'POST', { equipment });
+    if (j.ok) {
+      if (_charDetailData[name]) _charDetailData[name].equipment = equipment;
+      status(`✓ Equipment saved for ${name}`);
+    } else status(j.error ?? 'Save failed', 'err');
+  } catch(e) { status('Error: ' + e.message, 'err'); }
+}
+
+// ── Inventory tab ──────────────────────────────────────────────────────────
+
+function _charInvHtml(name, d) {
+  const inv = d.inventory ?? [];
+  const safeN = esc(name);
+  const rows = inv.map((item, i) => `
+    <tr>
+      <td style="padding:3px 4px;display:flex;gap:4px;align-items:center">
+        <input id="cinv-${safeN}-${i}-id" type="text" value="${esc(item.itemId??'')}" placeholder="item ID"
+          style="width:120px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:3px 6px;border-radius:4px;font:inherit;font-size:11px">
+        <button class="btn" style="font-size:11px;padding:1px 5px" title="Browse"
+          onclick="openItemPicker(id=>{document.getElementById('cinv-${safeN}-${i}-id').value=id;},'inventory')">⋯</button>
+      </td>
+      <td style="padding:3px 4px"><input id="cinv-${safeN}-${i}-qty" type="number" value="${item.qty??1}" min="1"
+        style="width:52px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:3px 6px;border-radius:4px;font:inherit;font-size:11px"></td>
+      <td style="padding:3px 4px"><input id="cinv-${safeN}-${i}-dur" type="text" value="${item.durability??''}" placeholder="null"
+        style="width:46px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:3px 6px;border-radius:4px;font:inherit;font-size:11px"></td>
+      <td style="padding:3px 4px"><button class="btn" style="font-size:11px;padding:2px 7px;color:#f85149;border-color:#4a1a1a"
+        onclick="charInvRemove('${safeN}',${i})">×</button></td>
+    </tr>`).join('');
+
+  return `<table style="font-size:12px;margin-bottom:8px;border-collapse:collapse">
+    <thead><tr style="color:#8b949e;font-size:10px;text-transform:uppercase;letter-spacing:.4px">
+      <th style="padding:3px 4px;text-align:left;font-weight:normal">Item ID</th>
+      <th style="padding:3px 4px;text-align:left;font-weight:normal">Qty</th>
+      <th style="padding:3px 4px;text-align:left;font-weight:normal">Dur</th>
+      <th></th>
+    </tr></thead>
+    <tbody id="cinv-body-${safeN}">${rows}</tbody>
+  </table>
+  <div style="display:flex;gap:8px">
+    <button class="btn" style="font-size:11px;padding:4px 10px" onclick="charInvAdd('${safeN}')">+ Add Item</button>
+    <button class="btn primary" style="font-size:11px;padding:4px 14px" onclick="charSaveInv('${safeN}')">Save Inventory</button>
+  </div>`;
+}
+
+// ── Item Picker modal ───────────────────────────────────────────────────────
+
+let _itemPickerCallback = null;
+let _itemPickerCursor   = -1;
+let _itemPickerFiltered = [];
+
+function openItemPicker(callback, modeLabel = '') {
+  _itemPickerCallback = callback;
+  _itemPickerCursor   = -1;
+  _itemPickerFiltered = [];
+  document.getElementById('item-picker-mode-label').textContent = modeLabel;
+  document.getElementById('item-picker-search').value = '';
+  const modal = document.getElementById('item-picker-modal');
+  modal.style.display = 'flex';
+  itemPickerFilter();
+  setTimeout(() => document.getElementById('item-picker-search').focus(), 30);
+}
+
+function itemPickerClose() {
+  document.getElementById('item-picker-modal').style.display = 'none';
+  _itemPickerCallback = null;
+}
+
+function itemPickerFilter() {
+  const q = document.getElementById('item-picker-search').value.toLowerCase();
+  const entries = Object.entries(itemDb ?? {});
+  _itemPickerFiltered = q
+    ? entries.filter(([id, it]) =>
+        id.includes(q) || (it.name??'').toLowerCase().includes(q) ||
+        (it.type??'').includes(q) || (it.slot??'').includes(q) || (it.subtype??'').includes(q))
+    : entries;
+  _itemPickerCursor = _itemPickerFiltered.length ? 0 : -1;
+  itemPickerRender();
+}
+
+function itemPickerRender() {
+  const list = document.getElementById('item-picker-list');
+  if (!list) return;
+  list.innerHTML = _itemPickerFiltered.map(([id, it], i) => {
+    const sel = i === _itemPickerCursor;
+    const typeTag = `<span style="font-size:10px;color:#8b949e;background:#0d1117;border:1px solid #30363d;border-radius:3px;padding:1px 5px">${it.type ?? '?'}${it.slot ? ' · ' + it.slot : ''}</span>`;
+    return `<div class="item-picker-row" data-idx="${i}"
+      style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:4px;cursor:pointer;${sel?'background:#1f6feb22;outline:1px solid #1f6feb':''}"
+      onclick="itemPickerSelect(${i})" onmouseover="itemPickerHover(${i})">
+      <div style="flex:1;min-width:0">
+        <div style="color:#e6edf3;font-size:12px">${esc(it.name ?? id)}</div>
+        <div style="color:#484f58;font-size:10px;font-family:monospace">${esc(id)}</div>
+      </div>
+      ${typeTag}
+    </div>`;
+  }).join('') || '<div style="color:#484f58;padding:10px;text-align:center">No items match</div>';
+}
+
+function itemPickerHover(i) {
+  _itemPickerCursor = i;
+  itemPickerRender();
+}
+
+function itemPickerKey(e) {
+  if (e.key === 'Escape') { itemPickerClose(); return; }
+  if (e.key === 'ArrowDown') { e.preventDefault(); _itemPickerCursor = Math.min(_itemPickerCursor + 1, _itemPickerFiltered.length - 1); itemPickerRender(); itemPickerScrollCursor(); return; }
+  if (e.key === 'ArrowUp')   { e.preventDefault(); _itemPickerCursor = Math.max(_itemPickerCursor - 1, 0); itemPickerRender(); itemPickerScrollCursor(); return; }
+  if (e.key === 'Enter') { itemPickerSelect(_itemPickerCursor); return; }
+}
+
+function itemPickerScrollCursor() {
+  const list = document.getElementById('item-picker-list');
+  const row  = list?.querySelector(`[data-idx="${_itemPickerCursor}"]`);
+  row?.scrollIntoView({ block: 'nearest' });
+}
+
+function itemPickerSelect(i) {
+  const entry = _itemPickerFiltered[i];
+  if (!entry) return;
+  const [id] = entry;
+  if (_itemPickerCallback) _itemPickerCallback(id);
+  itemPickerClose();
+}
+
+function charInvAdd(name) {
+  const d = _charDetailData[name];
+  if (!d) return;
+  openItemPicker(itemId => {
+    d.inventory = d.inventory ?? [];
+    d.inventory.push({ itemId, qty: 1, durability: null });
+    _charDetailRefresh(name);
+  }, 'Add to Inventory');
+}
+
+function charInvRemove(name, idx) {
+  const d = _charDetailData[name];
+  if (!d) return;
+  d.inventory.splice(idx, 1);
+  _charDetailRefresh(name);
+}
+
+async function charSaveInv(name) {
+  const d = _charDetailData[name];
+  if (!d) return;
+  const count = d.inventory?.length ?? 0;
+  const inventory = [];
+  for (let i = 0; i < count; i++) {
+    const itemId = document.getElementById(`cinv-${name}-${i}-id`)?.value?.trim();
+    if (!itemId) continue;
+    const qty    = parseInt(document.getElementById(`cinv-${name}-${i}-qty`)?.value ?? 1);
+    const durRaw = document.getElementById(`cinv-${name}-${i}-dur`)?.value?.trim();
+    const durability = (!durRaw || durRaw === 'null') ? null : parseFloat(durRaw);
+    inventory.push({ itemId, qty: isNaN(qty) ? 1 : qty, durability });
+  }
+  try {
+    const j = await api(`characters/${encodeURIComponent(name)}/save`, 'POST', { inventory });
+    if (j.ok) { d.inventory = inventory; status(`✓ Inventory saved for ${name}`); }
+    else status(j.error ?? 'Save failed', 'err');
+  } catch(e) { status('Error: ' + e.message, 'err'); }
+}
+
+// ── Quests tab ──────────────────────────────────────────────────────────────
+
+function _charQuestsHtml(name, d) {
+  const q = d.quests ?? { active: {}, completed: [], trackedIds: [] };
+  const active  = Object.entries(q.active ?? {});
+  const comp    = q.completed ?? [];
+  const tracked = q.trackedIds ?? [];
+  const safeN   = esc(name);
+
+  let html = '';
+  if (active.length > 0) {
+    html += `<div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Active (${active.length})</div>
+    <table style="font-size:11px;border-collapse:collapse;margin-bottom:14px;width:100%">
+      <tr style="color:#555;font-size:10px;border-bottom:1px solid #21262d">
+        <th style="text-align:left;padding:3px 6px;font-weight:normal">Quest ID</th>
+        <th style="padding:3px 6px;font-weight:normal">Stage</th>
+        <th style="text-align:left;padding:3px 6px;font-weight:normal">Progress</th>
+        <th></th>
+      </tr>`;
+    for (const [id, qd] of active) {
+      const pin = tracked.includes(id) ? ' 📌' : '';
+      html += `<tr style="border-bottom:1px solid #1c2128">
+        <td style="padding:4px 6px;color:#e6edf3">${esc(id)}${pin}</td>
+        <td style="padding:4px 6px;color:#f0b429;text-align:center">${qd.stage??0}</td>
+        <td style="padding:4px 6px;color:#8b949e;font-size:10px">${esc(JSON.stringify(qd.progress??{}))}</td>
+        <td style="padding:4px 6px">
+          <button class="btn" style="font-size:10px;padding:2px 6px;color:#f85149;border-color:#4a1a1a"
+            onclick="charQuestAbandon('${safeN}','${esc(id)}')">Abandon</button>
+        </td>
+      </tr>`;
+    }
+    html += '</table>';
+  } else {
+    html += `<div style="color:#8b949e;font-size:12px;margin-bottom:12px">No active quests.</div>`;
+  }
+
+  if (comp.length > 0) {
+    html += `<div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Completed (${comp.length})</div>
+    <div style="color:#3fb950;font-size:11px;line-height:1.8">${comp.map(id => esc(id)).join('&ensp;·&ensp; ')}</div>`;
+  }
+  return html || `<div style="color:#8b949e;font-size:12px">No quest data.</div>`;
+}
+
+async function charQuestAbandon(name, questId) {
+  const d = _charDetailData[name];
+  if (!d?.quests?.active) return;
+  delete d.quests.active[questId];
+  try {
+    const j = await api(`characters/${encodeURIComponent(name)}/save`, 'POST', { quests: d.quests });
+    if (j.ok) { status(`Abandoned ${questId}`); _charDetailRefresh(name); }
+    else status(j.error ?? 'Save failed', 'err');
+  } catch(e) { status('Error: ' + e.message, 'err'); }
+}
+
+// ── Modal helpers ──────────────────────────────────────────────────────────
+
+function charModalClose(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
+  _charModalTarget = null;
+}
+
+function charRename(name) {
+  _charModalTarget = name;
+  document.getElementById('char-rename-from').textContent = `Current name: ${name}`;
+  document.getElementById('char-rename-input').value = name;
+  const m = document.getElementById('char-rename-modal');
+  m.style.display = 'flex';
+  setTimeout(() => { document.getElementById('char-rename-input').focus(); document.getElementById('char-rename-input').select(); }, 50);
+}
+
+async function charRenameConfirm() {
+  const name    = _charModalTarget;
+  const newName = document.getElementById('char-rename-input').value.trim();
+  if (!name || !newName) return;
+  try {
+    const j = await api(`characters/${encodeURIComponent(name)}/rename`, 'POST', { newName });
+    if (j.success) {
+      charModalClose('char-rename-modal');
+      // Update local data
+      const sc = _charData.find(c => c.name === name);
+      if (sc) sc.name = newName;
+      if (_charDetailData[name]) { _charDetailData[newName] = { ..._charDetailData[name], name: newName }; delete _charDetailData[name]; }
+      if (_charDetailTab[name])  { _charDetailTab[newName] = _charDetailTab[name]; delete _charDetailTab[name]; }
+      if (_charExpandedName === name) _charExpandedName = newName;
+      status(`✓ Renamed ${name} → ${newName}`);
+      charsRender();
+    } else status(j.error ?? 'Rename failed', 'err');
+  } catch(e) { status('Error: ' + e.message, 'err'); }
+}
+
+function charChangePin(name) {
+  _charModalTarget = name;
+  document.getElementById('char-pin-target').textContent = `Character: ${name}`;
+  document.getElementById('char-pin-input').value = '';
+  const m = document.getElementById('char-pin-modal');
+  m.style.display = 'flex';
+  setTimeout(() => document.getElementById('char-pin-input').focus(), 50);
+}
+
+async function charPinConfirm() {
+  const name   = _charModalTarget;
+  const newPin = document.getElementById('char-pin-input').value;
+  if (!name || newPin.length < 4) { status('PIN must be at least 4 characters', 'err'); return; }
+  try {
+    const j = await api(`characters/${encodeURIComponent(name)}/pin`, 'POST', { newPin });
+    if (j.success) { charModalClose('char-pin-modal'); status(`✓ PIN updated for ${name}`); }
+    else status(j.error ?? 'Failed', 'err');
+  } catch(e) { status('Error: ' + e.message, 'err'); }
+}
+
+function charCopy(name) {
+  _charModalTarget = name;
+  document.getElementById('char-copy-from').textContent = `Copying from: ${name}`;
+  document.getElementById('char-copy-name').value = name + '_copy';
+  document.getElementById('char-copy-pin').value = '';
+  const m = document.getElementById('char-copy-modal');
+  m.style.display = 'flex';
+  setTimeout(() => { document.getElementById('char-copy-name').focus(); document.getElementById('char-copy-name').select(); }, 50);
+}
+
+async function charCopyConfirm() {
+  const name    = _charModalTarget;
+  const newName = document.getElementById('char-copy-name').value.trim();
+  const pin     = document.getElementById('char-copy-pin').value;
+  if (!name || !newName) return;
+  if (pin.length < 4) { status('PIN must be at least 4 characters', 'err'); return; }
+  try {
+    const j = await api(`characters/${encodeURIComponent(name)}/copy`, 'POST', { newName, pin });
+    if (j.success) { charModalClose('char-copy-modal'); status(`✓ Copied ${name} → ${newName}`); charsLoad(); }
+    else status(j.error ?? 'Copy failed', 'err');
+  } catch(e) { status('Error: ' + e.message, 'err'); }
+}
+
+async function charsDelete(name) {
+  if (!confirm(`Delete character "${name}"? This cannot be undone.`)) return;
+  try {
+    const res = await fetch(`/dev/api/characters/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    const j = await res.json();
+    if (j.ok) {
+      if (_charExpandedName === name) _charExpandedName = null;
+      delete _charDetailData[name];
+      delete _charDetailTab[name];
+      status(`Deleted ${name}`);
+      charsLoad();
+    } else status(j.error, 'err');
+  } catch(e) { status('Delete failed: ' + e.message, 'err'); }
+}
+
+// ────────────────────────────────────────────────────────
+// UTILS
+// ────────────────────────────────────────────────────────
+const v = id => document.getElementById(id)?.value ?? '';
+const esc = s => String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+let stTimer;
+function status(msg, cls='ok') {
+  const el = document.getElementById('status');
+  el.textContent = msg; el.className = cls;
+  clearTimeout(stTimer);
+  stTimer = setTimeout(() => { el.textContent=''; el.className=''; }, 5000);
+}
+
+init();
+</script>
+</body>
+</html>

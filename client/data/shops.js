@@ -1,0 +1,53 @@
+export const SHOP_DB = {
+  ashenvale_inn: [
+    { itemId: 'health_potion',       qty: Infinity, price: null },
+    { itemId: 'bread',               qty: Infinity, price: null },
+    { itemId: 'elixir_magic',        qty: 5,        price: null },
+  ],
+  ashenvale_blacksmith: [
+    { itemId: 'sword_iron',              qty: 5,  price: null },
+    { itemId: 'sword_reinforced_iron',   qty: 3,  price: null },
+    { itemId: 'axe_woodcutters',         qty: 4,  price: null },
+    { itemId: 'helm_iron',               qty: 4,  price: null },
+    { itemId: 'chest_chain',             qty: 2,  price: null },
+    { itemId: 'boots_leather',           qty: 5,  price: null },
+  ],
+  ashenvale_general: [
+    { itemId: 'health_potion',  qty: Infinity, price: null },
+    { itemId: 'bread',          qty: Infinity, price: null },
+    { itemId: 'antidote',       qty: 10,       price: null },
+    { itemId: 'boots_leather',  qty: 3,        price: null },
+    { itemId: 'chest_leather',  qty: 2,        price: null },
+    { itemId: 'iron_ore',       qty: 20,       price: null },
+  ],
+  millhaven_apothecary: [
+    { itemId: 'health_potion',       qty: Infinity, price: null },
+    { itemId: 'health_potion_large', qty: Infinity, price: null },
+    { itemId: 'elixir_magic',        qty: Infinity, price: null },
+    { itemId: 'antidote',            qty: Infinity, price: null },
+    { itemId: 'swamp_lotus',         qty: 5,        price: 25  },
+  ],
+  millhaven_market: [
+    { itemId: 'staff_apprentice',      qty: 2,        price: null },
+    { itemId: 'guild_robe_apprentice', qty: 1,        price: null },
+    { itemId: 'ring_ward',             qty: 1,        price: null },
+    { itemId: 'dagger_steel',          qty: 3,        price: null },
+    { itemId: 'bow_shortbow',          qty: 2,        price: null },
+    { itemId: 'neck_amulet_focus',     qty: 1,        price: null },
+  ],
+  bram_millhaven_stall: [
+    { itemId: 'health_potion',      qty: Infinity, price: 22 },
+    { itemId: 'antidote',           qty: 10,       price: 16 },
+    { itemId: 'bread',              qty: Infinity, price: 5  },
+    { itemId: 'iron_ore',           qty: 15,       price: 9  },
+    { itemId: 'boots_leather',      qty: 3,        price: null },
+    { itemId: 'dagger_steel',       qty: 2,        price: null },
+  ],
+  riverbow_traveling: [
+    { itemId: 'health_potion',  qty: 10, price: 25 },
+    { itemId: 'bread',          qty: 20, price: 6  },
+    { itemId: 'antidote',       qty: 8,  price: 18 },
+    { itemId: 'iron_ore',       qty: 15, price: 10 },
+    { itemId: 'legs_leather',   qty: 2,  price: null },
+  ],
+};

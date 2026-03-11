@@ -400,6 +400,19 @@ const server = http.createServer(async (req, res) => {
   let urlPath = req.url.split('?')[0];
   if (urlPath === '/') urlPath = '/index.html';
 
+  // Dev tool — password-gated in production via DEV_PASSWORD env var
+  const DEV_PASSWORD = process.env.DEV_PASSWORD;
+  if (DEV_PASSWORD && (urlPath.startsWith('/dev/'))) {
+    const auth = req.headers['authorization'] ?? '';
+    const [, token] = auth.split(' ');
+    const provided = token ? Buffer.from(token, 'base64').toString().split(':')[1] : '';
+    if (provided !== DEV_PASSWORD) {
+      res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Dev Tools"' });
+      res.end('Unauthorized');
+      return;
+    }
+  }
+
   // Dev API
   if (urlPath.startsWith('/dev/api/')) {
     await handleDevApi(req, res);

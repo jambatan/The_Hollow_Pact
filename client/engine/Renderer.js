@@ -24,6 +24,7 @@ export class Renderer {
     cam.applyTransform(ctx);
 
     this._renderLayer(ctx, zone.tileMap, 'ground', cam);
+    this._renderLayer(ctx, zone.tileMap, 'ground2', cam);
     this._renderLayer(ctx, zone.tileMap, 'objects', cam);
 
     // Ambient darkness applied to tiles; entities render on top so they stay visible

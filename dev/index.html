@@ -22,7 +22,7 @@ body{display:flex;flex-direction:column}
 .panel{display:none;flex:1;overflow:hidden}
 .panel.active{display:flex}
 /* ── tile mapper ── */
-#tm-list{width:270px;flex-shrink:0;overflow-y:auto;border-right:1px solid #30363d;padding:4px 0}
+#tm-list{overflow-y:auto;padding:4px 0}
 .tm-item{display:flex;align-items:center;gap:8px;padding:5px 10px;cursor:pointer;border-left:3px solid transparent}
 .tm-item:hover{background:#1c2128}
 .tm-item.sel{background:#1c2128;border-left-color:#58a6ff}
@@ -112,6 +112,8 @@ pre.data{font-size:11px;color:#8b949e;background:#0d1117;padding:8px;border-radi
     <button class="tab-btn" onclick="tab('loottables')">📋 Loot Tables</button>
     <button class="tab-btn" onclick="tab('world')">🌍 World Editor</button>
     <button class="tab-btn" onclick="tab('chars')">👥 Characters</button>
+    <button class="tab-btn" onclick="tab('quests')">📜 Quests</button>
+    <button class="tab-btn" onclick="tab('dialogue')">💬 Dialogue</button>
   </div>
   <div id="status"></div>
 </div>
@@ -119,11 +121,39 @@ pre.data{font-size:11px;color:#8b949e;background:#0d1117;padding:8px;border-radi
 
   <!-- ══ TILE MAPPER ══ -->
   <div id="p-tilemap" class="panel active">
-    <div id="tm-list"></div>
+    <div id="tm-list-wrap" style="width:270px;flex-shrink:0;border-right:1px solid #30363d;display:flex;flex-direction:column;overflow:hidden">
+      <!-- Inline tile-type editor — shown when a tile is selected -->
+      <div id="tm-edit-bar" style="display:none;flex-shrink:0;padding:8px 10px;background:#161b22;border-bottom:1px solid #30363d;flex-direction:column;gap:6px">
+        <div style="font-size:10px;color:#8b949e;letter-spacing:.5px">EDIT TILE TYPE <span id="tme-id" style="color:#58a6ff"></span></div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <input id="tme-name" placeholder="NAME" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:3px 7px;border-radius:4px;font:inherit;font-size:11px;flex:1;min-width:80px">
+          <select id="tme-cat" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:3px 6px;border-radius:4px;font:inherit;font-size:11px">
+            <option>terrain</option><option>wall</option><option>prop</option>
+            <option>door</option><option>special</option><option>roof</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#e6edf3;cursor:pointer;white-space:nowrap">
+            <input type="checkbox" id="tme-blocking"> Blocking
+          </label>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn primary" style="flex:1;font-size:11px;padding:3px" onclick="tmeSave()">💾 Save</button>
+          <button class="btn" style="font-size:11px;padding:3px;color:#f85149" onclick="tmeDelete()">✕ Delete</button>
+        </div>
+      </div>
+      <!-- Scrollable tile list -->
+      <div id="tm-list" style="flex:1;overflow-y:auto;padding:4px 0"></div>
+      <!-- Smart group section — shown when a tile is selected -->
+      <div id="tm-smart-section" style="display:none;flex-shrink:0;max-height:290px;overflow-y:auto;border-top:1px solid #30363d;background:#0d1117"></div>
+      <!-- Add New button pinned to bottom -->
+      <div style="flex-shrink:0;padding:6px 8px;border-top:1px solid #30363d;background:#161b22">
+        <button class="btn" style="width:100%;font-size:11px" onclick="tmeAddNew()">+ Add New Tile Type</button>
+      </div>
+    </div>
     <div id="tm-right">
       <div id="tm-bar">
         <span id="tm-hint">← Select a game tile, then click the sheet to assign it</span>
         <button class="btn primary" onclick="saveTilemap()">💾 Save kenneyTileMap.js</button>
+        <button id="btn-remap" class="btn" onclick="tmRunRemap()" title="Remap tile IDs in all zone files to new category ranges">🔀 Remap Tile IDs</button>
       </div>
       <div id="tm-wrap"><canvas id="tm-canvas"></canvas></div>
     </div>
@@ -208,9 +238,22 @@ pre.data{font-size:11px;color:#8b949e;background:#0d1117;padding:8px;border-radi
           <label>Layer</label>
           <select id="we-layer" onchange="weCurLayer=this.value;this.blur();weDrawZone()">
             <option value="ground">ground</option>
+            <option value="ground2">ground2</option>
             <option value="objects">objects</option>
             <option value="roof">roof</option>
           </select>
+          <label style="margin-left:6px">Brush</label>
+          <select id="we-brush-size" onchange="weBrushSize=+this.value;this.blur()" style="width:52px">
+            <option value="1">1×1</option>
+            <option value="2">2×2</option>
+            <option value="3">3×3</option>
+            <option value="5">5×5</option>
+            <option value="7">7×7</option>
+            <option value="9">9×9</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:3px;cursor:pointer;margin-left:4px" title="Round corners (sizes > 3×3)">
+            <input type="checkbox" id="we-brush-soft" onchange="weBrushSoft=this.checked" style="accent-color:#58a6ff">Soft
+          </label>
         </div>
         <!-- overlay mode controls -->
         <div id="we-ov-ctrl" style="display:none;font-size:10px;color:#8b949e;line-height:1.6">
@@ -264,6 +307,45 @@ pre.data{font-size:11px;color:#8b949e;background:#0d1117;padding:8px;border-radi
         <tbody id="chars-body"></tbody>
       </table>
       <div id="chars-empty" style="color:#8b949e;font-size:12px;display:none;padding:20px 0">No characters found.</div>
+    </div>
+  </div>
+
+  <!-- ══ QUESTS ══ -->
+  <div id="p-quests" class="panel">
+    <div class="ed-left">
+      <div class="ed-search" style="justify-content:space-between">
+        <input id="q-search" placeholder="Search…" oninput="qFilter()" style="flex:1">
+        <select id="q-type" onchange="qFilter()" style="width:90px">
+          <option value="">All</option>
+          <option value="main">Main</option>
+          <option value="side">Side</option>
+        </select>
+      </div>
+      <div class="ed-rows" id="q-rows"></div>
+    </div>
+    <div class="ed-form" id="q-form"><div class="empty">Select a quest to edit</div></div>
+  </div>
+
+  <!-- ══ DIALOGUE ══ -->
+  <div id="p-dialogue" class="panel">
+    <div class="ed-left">
+      <div class="ed-search" style="justify-content:space-between">
+        <input id="dl-search" placeholder="Search tree ID…" oninput="dlFilter()" style="flex:1">
+        <button class="btn" style="font-size:11px;padding:3px 8px" onclick="dlAddTree()">+ New</button>
+      </div>
+      <div class="ed-rows" id="dl-rows"></div>
+    </div>
+    <div style="flex:1;display:flex;overflow:hidden">
+      <!-- node list -->
+      <div id="dl-nodes-panel" style="width:190px;flex-shrink:0;border-right:1px solid #30363d;display:flex;flex-direction:column;overflow:hidden">
+        <div style="padding:6px 8px;border-bottom:1px solid #30363d;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#8b949e;flex-shrink:0">
+          <span id="dl-tree-label">Nodes</span>
+          <button class="btn" style="font-size:10px;padding:2px 7px" onclick="dlAddNode()">+ Node</button>
+        </div>
+        <div class="ed-rows" id="dl-node-rows" style="flex:1;overflow-y:auto"></div>
+      </div>
+      <!-- node editor -->
+      <div class="ed-form" id="dl-form" style="flex:1"><div class="empty">Select a dialogue tree, then a node</div></div>
     </div>
   </div>
 
@@ -326,6 +408,42 @@ pre.data{font-size:11px;color:#8b949e;background:#0d1117;padding:8px;border-radi
   </div>
 </div>
 
+<!-- Add New Tile modal -->
+<div id="tme-add-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center" onclick="if(event.target===this)tmeAddClose()">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px;min-width:300px;display:flex;flex-direction:column;gap:12px">
+    <div style="color:#e6edf3;font-size:13px;font-weight:600">Add New Tile Type</div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <label style="font-size:10px;color:#8b949e;text-transform:uppercase">Name (UPPER_SNAKE_CASE)</label>
+      <input id="tme-add-name" placeholder="e.g. COBBLESTONE" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 10px;border-radius:4px;font:inherit;font-size:12px"
+        onkeydown="if(event.key==='Enter')tmeAddConfirm();if(event.key==='Escape')tmeAddClose()">
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <label style="font-size:10px;color:#8b949e;text-transform:uppercase">Category</label>
+      <select id="tme-add-cat" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 10px;border-radius:4px;font:inherit;font-size:12px" onchange="tmeAddCatChange()">
+        <option value="terrain">Terrain (IDs 1–100)</option>
+        <option value="wall">Wall (IDs 101–150)</option>
+        <option value="door">Door (IDs 151–200)</option>
+        <option value="roof">Roof (IDs 201–300)</option>
+        <option value="special">Special (IDs 301–400)</option>
+        <option value="prop" selected>Prop (IDs 401–500)</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:16px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#e6edf3;cursor:pointer">
+        <input id="tme-add-blocking" type="checkbox" style="accent-color:#58a6ff"> Blocking
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#e6edf3;cursor:pointer">
+        <input id="tme-add-smart" type="checkbox" style="accent-color:#58a6ff"> Smart tile group
+      </label>
+    </div>
+    <div id="tme-add-err" style="color:#f85149;font-size:11px;display:none"></div>
+    <div style="display:flex;gap:6px">
+      <button class="btn primary" style="flex:1" onclick="tmeAddConfirm()">Add Tile</button>
+      <button class="btn" style="flex:1" onclick="tmeAddClose()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Sprite Builder Modal -->
 <div id="sb-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9100;align-items:flex-start;justify-content:center;padding-top:16px;overflow:auto">
   <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;display:flex;gap:16px">
@@ -347,8 +465,13 @@ pre.data{font-size:11px;color:#8b949e;background:#0d1117;padding:8px;border-radi
       <button class="btn" style="background:#8b0000;font-size:11px" onclick="sbClear()">✕ Clear Sprite</button>
     </div>
 
-    <!-- Right: Sheet browser -->
+    <!-- Right: Sheet browser + canvas sprites -->
     <div style="display:flex;flex-direction:column;gap:8px">
+      <!-- Canvas sprite picker -->
+      <div style="border:1px solid #30363d;border-radius:6px;padding:8px;background:#0d1117">
+        <div style="font-size:10px;color:#8b949e;letter-spacing:.5px;margin-bottom:6px">CANVAS SPRITES (no sheet required)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px" id="sb-canvas-sprites"></div>
+      </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button id="sb-btn-base"  class="btn primary" style="font-size:11px;padding:3px 10px" onclick="sbSetMode('base')">🧍 Set Base</button>
         <button id="sb-btn-layer" class="btn"         style="font-size:11px;padding:3px 10px" onclick="sbSetMode('layer')">➕ Add Layer</button>
@@ -359,7 +482,7 @@ pre.data{font-size:11px;color:#8b949e;background:#0d1117;padding:8px;border-radi
         <label style="font-size:11px;color:#8b949e">Zoom</label>
         <input type="range" id="sb-zoom" min="1" max="6" value="3" style="width:100px" oninput="sbDrawSheet()">
       </div>
-      <div style="overflow:auto;max-height:72vh;max-width:80vw">
+      <div style="overflow:auto;max-height:55vh;max-width:80vw">
         <canvas id="sb-canvas" style="cursor:crosshair;image-rendering:pixelated;display:block"></canvas>
       </div>
     </div>
@@ -521,6 +644,9 @@ const STRIDE = 17, TS = 16, ZOOM = 2, DS = TS * ZOOM; // display tile size = 32
 
 // World editor state
 let weZoneData = null, weCurLayer = 'ground', wePaintTile = 1, weZoom = 2, weGrid = true, wePainting = false;
+let weSmartGroup = null; // currently selected smart tile group (overrides wePaintTile)
+let _wePalFilter = { terrain:true, wall:true, roof:true, special:true, prop:true };
+let weBrushSize = 1, weBrushSoft = false;
 // Tile copy/paste state
 let _weCopyDrawing = null;  // { tx0, ty0, tx1, ty1 } during selection drag (tile coords)
 let _weClipboard   = null;  // { w, h, layers: { layerName: [...] } }
@@ -536,24 +662,8 @@ const TILE_COLORS = {
   29:'#a0723a',30:'#c8a0a0',40:'#c8a040',41:'#7a7a8a'
 };
 
-const GAME_TILES = [
-  {id:1,name:'GRASS',cat:'terrain'},{id:2,name:'DIRT',cat:'terrain'},
-  {id:3,name:'STONE_FLOOR',cat:'terrain'},{id:4,name:'WOOD_FLOOR',cat:'terrain'},
-  {id:5,name:'WATER',cat:'terrain'},{id:6,name:'SAND',cat:'terrain'},
-  {id:7,name:'SWAMP',cat:'terrain'},{id:8,name:'DUNGEON_FLOOR',cat:'terrain'},
-  {id:9,name:'PATH',cat:'terrain'},{id:10,name:'WALL_STONE',cat:'wall'},
-  {id:11,name:'WALL_WOOD',cat:'wall'},{id:12,name:'TREE',cat:'prop'},
-  {id:13,name:'TREE_TOP',cat:'prop'},{id:14,name:'BUSH',cat:'prop'},
-  {id:15,name:'FENCE',cat:'prop'},{id:16,name:'DOOR_CLOSED',cat:'door'},
-  {id:17,name:'DOOR_OPEN',cat:'door'},{id:18,name:'CHEST',cat:'prop'},
-  {id:19,name:'SIGN',cat:'prop'},{id:20,name:'TORCH',cat:'prop'},
-  {id:21,name:'STAIRS_DOWN',cat:'special'},{id:22,name:'STAIRS_UP',cat:'special'},
-  {id:23,name:'PRESSURE_PLATE',cat:'special'},{id:24,name:'GATE_CLOSED',cat:'door'},
-  {id:25,name:'GATE_OPEN',cat:'door'},{id:26,name:'WATER_DEEP',cat:'terrain'},
-  {id:27,name:'CAMPFIRE',cat:'prop'},{id:28,name:'BARREL',cat:'prop'},
-  {id:29,name:'TABLE',cat:'prop'},{id:30,name:'BED',cat:'prop'},
-  {id:40,name:'ROOF_THATCH',cat:'roof'},{id:41,name:'ROOF_STONE',cat:'roof'},
-];
+// Populated at init from /dev/api/tiledefs (client/data/tileDefs.js)
+let GAME_TILES = [];
 
 const CAT_CLR = {terrain:'#1a3d1a',wall:'#3d1a1a',prop:'#3d3a1a',door:'#1a2a3d',special:'#2a1a3d',roof:'#2a2a2a'};
 
@@ -562,7 +672,8 @@ const CAT_CLR = {terrain:'#1a3d1a',wall:'#3d1a1a',prop:'#3d3a1a',door:'#1a2a3d',
 // ────────────────────────────────────────────────────────
 async function init() {
   sheetImg = await loadImg('/assets/tilesets/roguelikeSheet_transparent.png');
-  await Promise.all([loadTilemap(), loadItems(), loadEnemies(), loadNpcs(), loadShops(), loadLootTables(), loadCharSheet(), weLoadZoneList()]);
+  await Promise.all([loadTileDefs(), loadTilemap(), loadItems(), loadEnemies(), loadNpcs(), loadShops(), loadLootTables(), loadCharSheet(), weLoadZoneList(),
+    api('smarttiles','GET').then(g => { smartDb = Array.isArray(g) ? g : []; })]);
   buildDataLists();
   buildTileList();
   drawSheet();
@@ -591,10 +702,22 @@ async function loadTilemap() {
   for (const [k,v] of Object.entries(d.map||{})) tileMap[+k] = v;
   sheetCols = d.cols || 57;
 }
-async function loadItems()   { try { itemDb  = await api('items');   } catch{} }
-async function loadEnemies() { try { enemyDb = await api('enemies'); } catch{} }
-async function loadNpcs()    { try { npcDb   = await api('npcs');    } catch{} }
-async function loadShops()   { try { shopDb  = await api('shops');   } catch{} }
+async function loadTileDefs() {
+  try {
+    const defs = await api('tiledefs');
+    GAME_TILES = Array.isArray(defs) ? defs : [];
+  } catch { GAME_TILES = []; }
+}
+async function loadItems()   { try { itemDb    = await api('items');    } catch{} }
+async function loadEnemies() { try { enemyDb   = await api('enemies');  } catch{} }
+async function loadNpcs()    { try { npcDb     = await api('npcs');     } catch{} }
+async function loadShops()   { try { shopDb    = await api('shops');    } catch{} }
+
+let questDb    = null;
+let dialogueDb = null;
+
+async function qLoad()  { try { questDb    = await api('quests');   qBuildRows(); } catch(e) { status('Failed to load quests: '+e.message,'err'); } }
+async function dlLoad() { try { dialogueDb = await api('dialogue'); dlBuildRows(); } catch(e) { status('Failed to load dialogue: '+e.message,'err'); } }
 
 let _editDropTable = []; // editable drop table for current enemy
 let _editLootTableIds = []; // editable loot table IDs for current enemy
@@ -663,11 +786,13 @@ function eAddDrop() {
 // ────────────────────────────────────────────────────────
 function tab(id) {
   document.querySelectorAll('.tab-btn').forEach((b,i) =>
-    b.classList.toggle('active', ['tilemap','items','enemies','npcs','shops','loottables','world','chars'][i]===id));
+    b.classList.toggle('active', ['tilemap','items','enemies','npcs','shops','loottables','world','chars','quests','dialogue'][i]===id));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('p-'+id).classList.add('active');
-  if (id === 'world') { weBuildPalette(); weDrawZone(); }
+  if (id === 'world') { if (!smartDb) stLoad(); else weBuildPalette(); weDrawZone(); }
   if (id === 'chars') { charsLoad(); }
+  if (id === 'quests' && !questDb) qLoad();
+  if (id === 'dialogue' && !dialogueDb) dlLoad();
 }
 
 // ────────────────────────────────────────────────────────
@@ -682,23 +807,196 @@ function sprStyle(idx, size=32) {
 }
 
 function buildTileList() {
-  document.getElementById('tm-list').innerHTML = GAME_TILES.map(t =>
-    `<div class="tm-item${selTile===t.id?' sel':''}" onclick="selectTile(${t.id})">
+  const sorted = [...GAME_TILES].sort((a, b) => a.id - b.id);
+
+  // Build smart-group lookup: tileId → {group, slot}
+  const tileSlotMap = new Map();
+  for (const g of (smartDb || [])) {
+    for (const [slot, tid] of Object.entries(g.tiles)) {
+      if (tid) tileSlotMap.set(tid, { group: g, slot });
+    }
+  }
+  // Base tile = explicit baseTile field, fallback to c slot for legacy groups
+  const baseTileId = g => g.baseTile || g.tiles.c || g.tiles['15'] || Object.values(g.tiles).find(v => v);
+  const variantOf  = new Map(); // variantId → baseId
+  for (const g of (smartDb || [])) {
+    const base = baseTileId(g);
+    if (!base) continue;
+    for (const [slot, tid] of Object.entries(g.tiles)) {
+      if (tid && tid !== base) variantOf.set(tid, base);
+    }
+  }
+
+  // Also map baseTile → group for groups that use baseTile instead of tiles.c
+  const baseTileGroupMap = new Map();
+  for (const g of (smartDb || [])) {
+    if (g.baseTile) baseTileGroupMap.set(g.baseTile, g);
+  }
+
+  const tileRow = (t, slotLabel = null) => {
+    const indent = slotLabel != null;
+    const TYPE_ICON = { hstrip3:'↔', vstrip3:'↕', patch9:'⊞', blob4:'✦' };
+    const groupInfo = tileSlotMap.get(t.id);
+    const baseGroup = baseTileGroupMap.get(t.id);
+    const isBase = !indent && (baseGroup || (groupInfo && groupInfo.slot === 'c'));
+    return `<div class="tm-item${selTile===t.id?' sel':''}" onclick="selectTile(${t.id})"
+      style="${indent ? 'padding-left:24px;background:#080c10;border-left:2px solid #21262d' : ''}">
       <div class="tm-spr" style="${sprStyle(tileMap[t.id])}"></div>
-      <div class="tm-nm">${t.name}<br><span class="tm-id">#${t.id}</span></div>
+      <div class="tm-nm">
+        ${indent ? `<span style="font-size:9px;color:#555;margin-right:3px">${slotLabel}</span>` : ''}${t.name}
+        ${isBase ? `<span style="font-size:9px;color:#58a6ff;margin-left:4px">${TYPE_ICON[(baseGroup||groupInfo?.group)?.type]||'✦'}</span>` : ''}
+        <br><span class="tm-id">#${t.id}</span>
+      </div>
       <div class="cat-badge" style="background:${CAT_CLR[t.cat]||'#222'}">${t.cat}</div>
-    </div>`
-  ).join('');
+    </div>`;
+  };
+
+  let html = '';
+  for (const t of sorted) {
+    if (variantOf.has(t.id)) continue; // rendered under their base tile
+    html += tileRow(t);
+    // If this tile is the base of a group, append its variants indented below
+    const info = tileSlotMap.get(t.id);
+    const baseGrp = baseTileGroupMap.get(t.id);
+    if ((info || baseGrp) && !variantOf.has(t.id)) {
+      const g = baseGrp || info.group;
+      const slots = ST_SLOTS[g.type] || [];
+      for (const slot of slots) {
+        const vid = g.tiles[slot];
+        if (!vid || vid === t.id) continue;
+        const vt = GAME_TILES.find(x => x.id === vid);
+        if (vt) html += tileRow(vt, slot);
+      }
+    }
+  }
+  document.getElementById('tm-list').innerHTML = html || '<div class="empty">No tiles</div>';
 }
 
 function selectTile(id) {
   selTile = id;
+  _tmArmedSlot = null; // clear any armed slot when switching tiles
+  _tmCurrentGroupId = tmFindGroupForTile(id)?.id ?? null; // sync group context by tile
   buildTileList();
   drawSheet();
-  const gt = GAME_TILES.find(t=>t.id===id);
+  const gt = GAME_TILES.find(t => t.id === id);
   const idx = tileMap[id];
   document.getElementById('tm-hint').textContent =
     `Selected: ${gt?.name}  (currently → index ${idx ?? 'none'})  •  Click sheet to assign`;
+  // Show inline edit bar
+  const bar = document.getElementById('tm-edit-bar');
+  if (gt && bar) {
+    document.getElementById('tme-id').textContent = `#${id}`;
+    document.getElementById('tme-name').value = gt.name;
+    const catSel = document.getElementById('tme-cat');
+    catSel.value = gt.cat;
+    document.getElementById('tme-blocking').checked = !!gt.blocking;
+    bar.style.display = 'flex';
+  }
+  tmRenderSmartSection();
+}
+
+async function tmeSave() {
+  const t = GAME_TILES.find(t => t.id === selTile);
+  if (!t) return;
+  const name = document.getElementById('tme-name').value.trim().toUpperCase().replace(/\s+/g,'_');
+  if (!name) { status('Name is required', 'err'); return; }
+  t.name     = name;
+  t.cat      = document.getElementById('tme-cat').value;
+  t.blocking = document.getElementById('tme-blocking').checked;
+  await tmdFlush();
+  buildTileList();
+  weBuildPalette();
+}
+
+async function tmeDelete() {
+  const t = GAME_TILES.find(t => t.id === selTile);
+  if (!confirm(`Delete tile type #${selTile} "${t?.name}"?\n\nAny tiles with this ID already painted in zones will render as empty.`)) return;
+  const idx = GAME_TILES.findIndex(t => t.id === selTile);
+  if (idx !== -1) GAME_TILES.splice(idx, 1);
+  selTile = null;
+  document.getElementById('tm-edit-bar').style.display = 'none';
+  await tmdFlush();
+  buildTileList();
+  weBuildPalette();
+  document.getElementById('tm-hint').textContent = '← Select a game tile, then click the sheet to assign it';
+}
+
+function tmeAddNew() {
+  const modal = document.getElementById('tme-add-modal');
+  document.getElementById('tme-add-name').value = '';
+  document.getElementById('tme-add-cat').value = 'prop';
+  document.getElementById('tme-add-blocking').checked = false;
+  document.getElementById('tme-add-smart').checked = false;
+  document.getElementById('tme-add-err').style.display = 'none';
+  modal.style.display = 'flex';
+  setTimeout(() => document.getElementById('tme-add-name').focus(), 30);
+}
+
+function tmeAddCatChange() {
+  const cat = document.getElementById('tme-add-cat').value;
+  document.getElementById('tme-add-blocking').checked = ['wall','door'].includes(cat);
+}
+
+function tmeAddClose() {
+  document.getElementById('tme-add-modal').style.display = 'none';
+}
+
+async function tmeAddConfirm() {
+  const CAT_RANGES = { terrain:[1,100], wall:[101,150], door:[151,200], roof:[201,300], special:[301,400], prop:[401,500] };
+  const errEl = document.getElementById('tme-add-err');
+  const showErr = msg => { errEl.textContent = msg; errEl.style.display = 'block'; };
+  const raw = document.getElementById('tme-add-name').value;
+  const cleanName = raw.trim().toUpperCase().replace(/\s+/g,'_');
+  if (!cleanName) { showErr('Name is required'); return; }
+  if (GAME_TILES.find(t => t.name === cleanName)) { showErr(`"${cleanName}" already exists`); return; }
+  const cat = document.getElementById('tme-add-cat').value;
+  const [lo, hi] = CAT_RANGES[cat];
+  const used = new Set(GAME_TILES.map(t => t.id));
+  let nextId = lo;
+  while (nextId <= hi && used.has(nextId)) nextId++;
+  if (nextId > hi) { showErr(`${cat} range (${lo}–${hi}) is full`); return; }
+  const blocking = document.getElementById('tme-add-blocking').checked;
+  const wantSmart = document.getElementById('tme-add-smart').checked;
+  const entry = { id: nextId, name: cleanName, cat, blocking };
+  GAME_TILES.push(entry);
+  if (wantSmart && smartDb) {
+    const group = { id: `sg_${Date.now()}`, name: cleanName, type: 'patch9', baseTile: nextId, layer: cat === 'terrain' ? 'ground' : 'objects', tiles: {} };
+    smartDb.push(group);
+    _tmCurrentGroupId = group.id;
+    await api('smarttiles', 'POST', { groups: smartDb });
+  }
+  tmeAddClose();
+  selectTile(nextId);
+  tmdFlush();
+  weBuildPalette();
+}
+
+async function tmRunRemap() {
+  const OLD_TO_NEW = {
+    21:101, 22:102,                                         // wall
+    41:151, 42:152, 43:153, 44:154,                         // door
+    51:201, 52:202,                                         // roof
+    101:301, 102:302, 103:303,                              // special
+    61:401, 62:402, 63:403, 64:404, 65:405, 66:406,        // prop
+    67:407, 68:408, 69:409, 70:410, 71:411,                 // prop cont.
+    200:1001, 201:1002, 202:1003, 203:1004, 204:1005,       // smart variants
+    205:1006, 206:1007, 207:1008, 208:1009                  // smart variants cont.
+  };
+  if (!confirm('This will remap tile IDs in ALL zone files to the new category ranges.\n\nOld→New:\n' +
+    Object.entries(OLD_TO_NEW).map(([o,n])=>`  ${o} → ${n}`).join('\n') +
+    '\n\nContinue?')) return;
+  const btn = document.getElementById('btn-remap');
+  btn.disabled = true; btn.textContent = '⏳ Remapping…';
+  try {
+    const res = await api('remap-tiles', 'POST', { map: OLD_TO_NEW });
+    btn.textContent = `✓ Done (${res.zones} zones, ${res.replacements} replacements)`;
+    status(`Remap complete: ${res.zones} zones, ${res.replacements} tile replacements`, 'ok');
+    // Reload current zone if one is loaded
+    if (weZoneData?.id) weLoadZone(weZoneData.id);
+  } catch(e) {
+    btn.disabled = false; btn.textContent = '🔀 Remap Tile IDs';
+    status('Remap failed: ' + e.message, 'err');
+  }
 }
 
 function drawSheet() {
@@ -728,6 +1026,27 @@ function drawSheet() {
     ctx.strokeStyle='#f0b429'; ctx.lineWidth=2;
     ctx.strokeRect(c*STRIDE*ZOOM+1, r*STRIDE*ZOOM+1, DS-2, DS-2);
   }
+  // Smart group: highlight all assigned slots with teal tint + slot label
+  if (selTile != null) {
+    const group = (_tmCurrentGroupId && (smartDb||[]).find(g => g.id === _tmCurrentGroupId)) || tmFindGroupForTile?.(selTile);
+    if (group) {
+      for (const [slot, tid] of Object.entries(group.tiles)) {
+        if (!tid || tileMap[tid] == null) continue;
+        const armed = _tmArmedSlot === slot;
+        const si = tileMap[tid];
+        const sc = si % sheetCols, sr = Math.floor(si / sheetCols);
+        ctx.fillStyle = armed ? 'rgba(88,166,255,0.35)' : 'rgba(63,185,80,0.20)';
+        ctx.fillRect(sc*STRIDE*ZOOM, sr*STRIDE*ZOOM, DS, DS);
+        ctx.strokeStyle = armed ? '#58a6ff' : '#3fb950';
+        ctx.lineWidth = armed ? 2 : 1;
+        ctx.strokeRect(sc*STRIDE*ZOOM+1, sr*STRIDE*ZOOM+1, DS-2, DS-2);
+        // Slot label in corner
+        ctx.fillStyle = armed ? '#58a6ff' : '#3fb950';
+        ctx.font = 'bold 7px monospace';
+        ctx.fillText(slot, sc*STRIDE*ZOOM+2, sr*STRIDE*ZOOM+9);
+      }
+    }
+  }
   // Row/col labels every 5
   ctx.font = '8px monospace'; ctx.fillStyle = 'rgba(136,200,255,0.55)';
   for (let c=0;c<COLS;c+=5) ctx.fillText(`c${c}`, c*STRIDE*ZOOM+2, 8);
@@ -735,10 +1054,53 @@ function drawSheet() {
 }
 
 document.getElementById('tm-canvas').addEventListener('click', e => {
-  if (selTile == null) { status('Select a tile on the left first', 'err'); return; }
   const col = Math.floor(e.offsetX / (STRIDE*ZOOM));
   const row = Math.floor(e.offsetY / (STRIDE*ZOOM));
   const idx = row * sheetCols + col;
+
+  // Smart slot assignment mode: armed slot picks from sheet
+  if (_tmArmedSlot != null && selTile != null) {
+    const group = (_tmCurrentGroupId && (smartDb||[]).find(g => g.id === _tmCurrentGroupId))
+               || tmFindGroupForTile(selTile);
+    if (group) {
+      _tmCurrentGroupId = group.id; // ensure stable
+      let targetId = tmSheetIdxToTileId(idx);
+      if (!targetId) {
+        // Auto-create a new tile for this sheet cell, named after the GROUP (not selTile)
+        const parentName = group.name;
+        const existingNames = new Set(GAME_TILES.map(t => t.name));
+        // Prefer slot-based name (e.g. LAVA_NW), fall back to numeric if taken
+        const slotSuffix = _tmArmedSlot ? `_${_tmArmedSlot.toUpperCase()}` : '_2';
+        let newName = `${parentName}${slotSuffix}`;
+        if (existingNames.has(newName)) {
+          let suffix = 2;
+          do { newName = `${parentName}_${suffix++}`; } while (existingNames.has(newName));
+        }
+        const usedIds = new Set(GAME_TILES.map(t => t.id));
+        let newId = 1001; while (usedIds.has(newId)) newId++;
+        const baseTile = GAME_TILES.find(t => t.id === selTile);
+        const variantCat = baseTile?.cat || (group.layer === 'objects' ? 'prop' : 'terrain');
+        GAME_TILES.push({ id: newId, name: newName, cat: variantCat, blocking: false });
+        tileMap[newId] = idx;
+        targetId = newId;
+        buildTileList(); drawSheet();
+        status(`Auto-created: ${newName} (#${newId}) — save kenneyTileMap.js + tileDefs when done`, 'ok');
+      }
+      group.tiles[_tmArmedSlot] = targetId;
+      // Auto-advance to next slot in this type's slot list
+      const slots = ST_SLOTS[group.type] || [];
+      const curIdx = slots.indexOf(_tmArmedSlot);
+      _tmArmedSlot = (curIdx >= 0 && curIdx < slots.length - 1) ? slots[curIdx + 1] : null;
+      const nm = GAME_TILES.find(t=>t.id===targetId)?.name || targetId;
+      status(`Slot "${slots[curIdx]}" → ${nm}${_tmArmedSlot ? ` · next: "${_tmArmedSlot}"` : ' · done!'}`, 'ok');
+      tmRenderSmartSection();
+      drawSheet();
+      return;
+    }
+  }
+
+  // Normal tile assignment
+  if (selTile == null) { status('Select a tile on the left first', 'err'); return; }
   tileMap[selTile] = idx;
   buildTileList(); drawSheet();
   const nm = GAME_TILES.find(t=>t.id===selTile)?.name;
@@ -862,8 +1224,9 @@ function editEnemy(id) {
     <div class="f-title" style="display:flex;justify-content:space-between;align-items:center">
       <span>${en.name} <span style="color:#8b949e;font-weight:400;font-size:11px">(${id})</span></span>
       <span style="display:flex;align-items:center;gap:6px">
-        ${en.charSprite ? `<canvas id="ef-sprite-preview" width="16" height="16" style="image-rendering:pixelated;border:1px solid #30363d;border-radius:2px"></canvas>` : ''}
-        <button class="btn" style="font-size:11px;padding:3px 8px" onclick="openSpriteBuilder(enemyDb['${id}'].charSprite, s=>{enemyDb['${id}'].charSprite=s;editEnemy('${id}')})">🎨 Build Sprite</button>
+        ${(en.charSprite||en.sprite) ? `<canvas id="ef-sprite-preview" width="16" height="16" style="image-rendering:pixelated;border:1px solid #30363d;border-radius:2px"></canvas>` : ''}
+        <span style="font-size:10px;color:#8b949e">${en.sprite&&!en.charSprite?'['+en.sprite+']':''}</span>
+        <button class="btn" style="font-size:11px;padding:3px 8px" onclick="openSpriteBuilder(enemyDb['${id}'].charSprite, enemyDb['${id}'].sprite, result=>{if(!result){enemyDb['${id}'].charSprite=null;}else if(result.canvasType){enemyDb['${id}'].charSprite=null;enemyDb['${id}'].sprite=result.canvasType;}else{enemyDb['${id}'].charSprite=result;}editEnemy('${id}')})">🎨 Build Sprite</button>
       </span>
     </div>
     <div class="f-grid">
@@ -906,7 +1269,15 @@ function editEnemy(id) {
     </div>`;
   _editDropTable = JSON.parse(JSON.stringify(en.dropTable||[]));
   _editLootTableIds = [...(en.lootTableIds ?? (en.lootTableId ? [en.lootTableId] : []))];
-  setTimeout(() => { buildDropRows(); buildLtChips(); drawSpritePreview('ef-sprite-preview', en.charSprite); }, 0);
+  setTimeout(() => {
+    buildDropRows(); buildLtChips();
+    if (en.charSprite) drawSpritePreview('ef-sprite-preview', en.charSprite);
+    else if (en.sprite) {
+      const def = SB_CANVAS_SPRITES.find(d => d.type === en.sprite);
+      const c = document.getElementById('ef-sprite-preview');
+      if (def && c) sbDrawCanvasSprite(c, def);
+    }
+  }, 0);
 }
 
 async function saveEnemy(id) {
@@ -1240,16 +1611,93 @@ let sbBase = null;
 let sbLayers = [];   // [{ idx, mirror }, ...]
 let sbMode = 'base'; // 'base' | 'layer'
 let sbZoom = 3;
+let sbCanvasType = null; // e.g. 'skeleton', 'bandit' — selected canvas sprite type
 
 // Normalise a layer entry from stored format (number or object) to { idx, mirror }
 function sbNormLayer(l) { return typeof l === 'number' ? { idx: l, mirror: false } : { idx: l.idx, mirror: !!l.mirror }; }
 
-function openSpriteBuilder(existing, callback) {
+// Canvas sprite definitions matching Enemy.js ENEMY_COLORS / _drawShape
+const SB_CANVAS_SPRITES = [
+  { type: 'skeleton',     label: 'Skeleton',     body: '#ddddcc', accent: '#aaaa99', eyes: '#111' },
+  { type: 'zombie',       label: 'Zombie',        body: '#668866', accent: '#446644', eyes: '#88ff88' },
+  { type: 'goblin',       label: 'Goblin',        body: '#448844', accent: '#336633', eyes: '#f00' },
+  { type: 'bandit',       label: 'Bandit',        body: '#664422', accent: '#553311', eyes: '#f00' },
+  { type: 'slime',        label: 'Slime',         body: '#44aa44', accent: '#339933', eyes: '#44aa44' },
+  { type: 'spider',       label: 'Spider',        body: '#222222', accent: '#111111', eyes: '#f00' },
+  { type: 'mire_crawler', label: 'Mire Crawler',  body: '#446644', accent: '#335533', eyes: '#f00' },
+  { type: 'default',      label: 'Generic',       body: '#cc2222', accent: '#881111', eyes: '#f00' },
+];
+
+function sbDrawCanvasSprite(canvas, def) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const x = 4, y = 4, sw = w - 8, sh = h - 8;
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath(); ctx.ellipse(x+sw/2, y+sh+1, sw/2-1, 2, 0, 0, Math.PI*2); ctx.fill();
+  switch (def.type) {
+    case 'skeleton':
+      ctx.fillStyle = def.body; ctx.fillRect(x+3,y+4,sw-6,sh-5); ctx.fillRect(x+3,y,sw-6,5);
+      ctx.fillStyle = '#111'; ctx.fillRect(x+4,y+1,2,2); ctx.fillRect(x+sw-6,y+1,2,2); break;
+    case 'zombie':
+      ctx.fillStyle = def.body; ctx.fillRect(x+2,y+4,sw-4,sh-4); ctx.fillRect(x+3,y,sw-6,6);
+      ctx.fillStyle = def.eyes; ctx.fillRect(x+4,y+2,2,2); ctx.fillRect(x+sw-6,y+2,2,2); break;
+    case 'slime':
+      ctx.fillStyle = def.body;
+      ctx.beginPath(); ctx.ellipse(x+sw/2,y+sh/2+2,sw/2,sh/2-1,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = def.accent; ctx.fillRect(x+4,y+sh/2-1,2,2); ctx.fillRect(x+sw-6,y+sh/2-1,2,2); break;
+    default:
+      ctx.fillStyle = def.body; ctx.fillRect(x+2,y+4,sw-4,sh-4);
+      ctx.fillStyle = def.accent; ctx.fillRect(x+3,y,sw-6,6);
+      ctx.fillStyle = def.eyes; ctx.fillRect(x+4,y+2,2,2); ctx.fillRect(x+sw-6,y+2,2,2); break;
+  }
+}
+
+function sbBuildCanvasSpritePicker() {
+  const el = document.getElementById('sb-canvas-sprites');
+  if (!el) return;
+  el.innerHTML = SB_CANVAS_SPRITES.map(def => `
+    <div onclick="sbSelectCanvasSprite('${def.type}')" id="sb-cs-${def.type}" title="${def.label}"
+      style="display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:4px 6px;border-radius:5px;border:2px solid transparent;transition:border-color .1s">
+      <canvas id="sb-csp-${def.type}" width="40" height="40" style="image-rendering:pixelated;border:1px solid #30363d;border-radius:3px;background:#0d1117"></canvas>
+      <span style="font-size:9px;color:#8b949e;text-align:center;line-height:1.2">${def.label}</span>
+    </div>`).join('');
+  // Draw each sprite after DOM insertion
+  setTimeout(() => SB_CANVAS_SPRITES.forEach(def => {
+    const c = document.getElementById('sb-csp-'+def.type);
+    if (c) sbDrawCanvasSprite(c, def);
+  }), 0);
+}
+
+function sbSelectCanvasSprite(type) {
+  sbCanvasType = type;
+  sbBase = null; sbLayers = [];
+  // Highlight selected
+  document.querySelectorAll('#sb-canvas-sprites > div').forEach(el => {
+    el.style.borderColor = el.id === 'sb-cs-'+type ? '#58a6ff' : 'transparent';
+  });
+  sbUpdatePreview();
+}
+
+function openSpriteBuilder(existing, currentCanvasType, callback) {
+  // Support old 2-arg call: openSpriteBuilder(existing, callback)
+  if (typeof currentCanvasType === 'function') { callback = currentCanvasType; currentCanvasType = null; }
   sbCallback = callback;
   sbBase = existing?.base ?? null;
   sbLayers = (existing?.layers ?? []).map(sbNormLayer);
+  sbCanvasType = sbBase == null ? (currentCanvasType ?? null) : null;
   sbMode = 'base';
   document.getElementById('sb-modal').style.display = 'flex';
+  sbBuildCanvasSpritePicker();
+  // Highlight if canvas type already selected
+  if (sbCanvasType) {
+    setTimeout(() => {
+      document.querySelectorAll('#sb-canvas-sprites > div').forEach(el => {
+        el.style.borderColor = el.id === 'sb-cs-'+sbCanvasType ? '#58a6ff' : 'transparent';
+      });
+    }, 0);
+  }
   sbUpdateModeButtons();
   sbDrawSheet();
   sbRenderLayers();
@@ -1262,7 +1710,11 @@ function sbClose() {
 }
 
 function sbConfirm() {
-  if (sbBase == null) { alert('Select a base sprite first (click 🧍 Set Base, then click a tile)'); return; }
+  if (sbCanvasType) {
+    if (sbCallback) sbCallback({ canvasType: sbCanvasType });
+    sbClose(); return;
+  }
+  if (sbBase == null) { alert('Select a base sprite (click 🧍 Set Base, then click a tile) or pick a Canvas Sprite above'); return; }
   if (sbCallback) sbCallback({ base: sbBase, layers: sbLayers.map(l => ({ idx: l.idx, mirror: l.mirror })) });
   sbClose();
 }
@@ -1376,10 +1828,17 @@ function sbRemoveLayer(i) {
 
 function sbUpdatePreview() {
   const canvas = document.getElementById('sb-preview');
-  if (!canvas || !charImg) return;
+  if (!canvas) return;
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, 64, 64);
+  // Canvas sprite preview
+  if (sbCanvasType) {
+    const def = SB_CANVAS_SPRITES.find(d => d.type === sbCanvasType);
+    if (def) { canvas.width = 64; canvas.height = 64; sbDrawCanvasSprite(canvas, def); }
+    return;
+  }
+  if (!charImg) return;
   const cols = charSheetCols();
   const drawLayer = (idx, mirror) => {
     const tc = idx % cols, tr = Math.floor(idx / cols);
@@ -1400,6 +1859,9 @@ document.getElementById('sb-canvas').addEventListener('click', e => {
   const col = Math.floor(e.offsetX / (CHAR_STRIDE * sbZoom));
   const row = Math.floor(e.offsetY / (CHAR_STRIDE * sbZoom));
   const idx = row * charSheetCols() + col;
+  // Switching to Kenny sheet clears canvas sprite selection
+  sbCanvasType = null;
+  document.querySelectorAll('#sb-canvas-sprites > div').forEach(el => el.style.borderColor = 'transparent');
   if (sbMode === 'base') {
     sbBase = idx;
   } else {
@@ -1710,6 +2172,12 @@ async function weLoadZone(forceId) {
   status('Loading ' + id + '…', 'ok');
   const d = await api('zone/' + id);
   if (d.error) { status('Load failed: ' + d.error, 'err'); return; }
+  // Auto-add ground2 layer if not present (between ground and objects)
+  if (!d.layers.find(l => l.name === 'ground2')) {
+    const gIdx = d.layers.findIndex(l => l.name === 'ground');
+    const blank = new Array(d.width * d.height).fill(0);
+    d.layers.splice(gIdx + 1, 0, { name: 'ground2', data: blank });
+  }
   weZoneData = d;
   weDirty = false;
   weSelOv = null;
@@ -1738,18 +2206,73 @@ function weSetMode(mode) {
 
 function weBuildPalette() {
   const pal = document.getElementById('we-palette');
-  const tiles = [{id:0,name:'Erase',cat:'erase'}].concat(GAME_TILES);
-  pal.innerHTML = tiles.map(t => {
+  pal.style.cssText = 'flex:1;display:flex;flex-direction:column;overflow:hidden;padding:0';
+
+  const F = _wePalFilter;
+  const FILTER_DEFS = [
+    { key:'terrain', label:'Terrain', cats:['terrain'] },
+    { key:'wall',    label:'Wall/Door', cats:['wall','door'] },
+    { key:'roof',    label:'Roof',    cats:['roof'] },
+    { key:'special', label:'Special', cats:['special'] },
+    { key:'prop',    label:'Prop',    cats:['prop'] },
+  ];
+  const visibleCats = new Set(FILTER_DEFS.filter(f => F[f.key]).flatMap(f => f.cats));
+  visibleCats.add('erase');
+
+  const filterBar = FILTER_DEFS.map(f =>
+    `<label style="display:flex;align-items:center;gap:3px;font-size:10px;color:${F[f.key]?'#e6edf3':'#555'};cursor:pointer;white-space:nowrap">
+      <input type="checkbox" ${F[f.key]?'checked':''} onchange="_wePalFilter['${f.key}']=this.checked;weBuildPalette()" style="accent-color:#58a6ff;width:11px;height:11px"> ${f.label}
+    </label>`
+  ).join('');
+
+  // Normal tiles — exclude smart variants (id >= 1001)
+  const tiles = [{id:0,name:'Erase',cat:'erase'}].concat(
+    GAME_TILES.filter(t => t.id < 1001 && visibleCats.has(t.cat))
+  );
+  const tilesHtml = tiles.map(t => {
     let spr;
     if (t.id === 0) spr = `background:#111;border:1px dashed #555`;
     else if (tileMap[t.id] != null) spr = sprStyle(tileMap[t.id], 22);
     else spr = `background:${TILE_COLORS[t.id]||'#888'}`;
-    return `<div class="we-pi${wePaintTile===t.id?' sel':''}" onclick="weSelTile(${t.id})">
+    const sel = !weSmartGroup && wePaintTile === t.id;
+    return `<div class="we-pi${sel?' sel':''}" onclick="weSelTile(${t.id})">
       <div class="spr" style="${spr}"></div><span>${t.name}</span></div>`;
   }).join('');
+
+  // Smart tile groups
+  const groups = smartDb || [];
+  const TYPE_ICON = { hstrip3:'↔', vstrip3:'↕', patch9:'⊞', blob4:'✦' };
+  const smartHtml = groups.length ? groups.map(g => {
+    const sel = weSmartGroup?.id === g.id;
+    const cid = g.tiles.c || g.tiles.m || g.tiles.l || Object.values(g.tiles).find(v=>v>0);
+    const spr = cid && tileMap[cid]!=null ? sprStyle(tileMap[cid],22)
+              : cid ? `background:${TILE_COLORS[cid]||'#555'}` : 'background:#111;border:1px dashed #555';
+    return `<div class="we-pi${sel?' sel':''}" onclick="weSelSmartGroup('${g.id}')" title="${esc(g.name)} (${g.type})">
+      <div class="spr" style="${spr}"></div>
+      <span style="color:${sel?'#e6edf3':'#aaa'}">${TYPE_ICON[g.type]||'?'} ${esc(g.name)}</span>
+    </div>`;
+  }).join('') : `<div style="color:#555;font-size:10px;padding:4px 6px;font-style:italic">No smart tile groups</div>`;
+
+  pal.innerHTML = `
+    <div style="flex-shrink:0;padding:5px 6px;border-bottom:1px solid #21262d;display:flex;flex-wrap:wrap;gap:4px 10px;background:#0d1117">
+      ${filterBar}
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:3px;min-height:0">
+      ${tilesHtml}
+    </div>
+    <div style="flex-shrink:0;padding:3px 8px;color:#8b949e;font-size:10px;font-weight:600;letter-spacing:.5px;border-top:1px solid #21262d;background:#0d1117">SMART TILES</div>
+    <div style="flex:0 0 35%;overflow-y:auto;padding:3px;background:#0a0e13">
+      ${smartHtml}
+    </div>`;
 }
 
-function weSelTile(id) { wePaintTile = id; weBuildPalette(); }
+function weSelTile(id) { weSmartGroup = null; wePaintTile = id; weBuildPalette(); }
+
+function weSelSmartGroup(id) {
+  weSmartGroup = (smartDb||[]).find(g => g.id === id) || null;
+  if (weSmartGroup) wePaintTile = -1; // sentinel — never matches any tile data
+  weBuildPalette();
+}
 
 // ── Overlay inspector (sidebar list) ──────────────────────────────────────────
 function weRebuildInspector() {
@@ -1916,7 +2439,7 @@ function weDrawZone() {
   ctx.fillStyle = '#0a0a0a';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  for (const layerName of ['ground','objects','roof']) {
+  for (const layerName of ['ground','ground2','objects','roof']) {
     const layer = layers.find(l => l.name === layerName);
     if (!layer) continue;
     ctx.globalAlpha = layerName === 'roof' ? 0.55 : 1;
@@ -2142,6 +2665,23 @@ function weHitOverlay(wx, wy) {
   return null;
 }
 
+// ── Brush shape helper ─────────────────────────────────────────────────────────
+function weBrushCells(cx, cy) {
+  const s = weBrushSize;
+  if (s <= 1) return [[cx, cy]];
+  const lo = -Math.floor((s - 1) / 2);
+  const hi =  Math.ceil((s - 1) / 2);
+  const r2 = (s / 2) * (s / 2);
+  const cells = [];
+  for (let dy = lo; dy <= hi; dy++) {
+    for (let dx = lo; dx <= hi; dx++) {
+      if (weBrushSoft && s > 3 && (dx * dx + dy * dy) > r2) continue;
+      cells.push([cx + dx, cy + dy]);
+    }
+  }
+  return cells;
+}
+
 // ── Tile painting ──────────────────────────────────────────────────────────────
 function wePaintAt(e) {
   if (!weZoneData || !wePainting) return;
@@ -2151,13 +2691,128 @@ function wePaintAt(e) {
   const tx = Math.floor((e.clientX - rect.left) / TS2);
   const ty = Math.floor((e.clientY - rect.top)  / TS2);
   if (tx < 0 || ty < 0 || tx >= width || ty >= height) return;
-  const layer = weZoneData.layers.find(l => l.name === weCurLayer);
+
+  const cells = weBrushCells(tx, ty).filter(([cx, cy]) => cx >= 0 && cy >= 0 && cx < width && cy < height);
+  let dirty = false;
+
+  for (const [cx, cy] of cells) {
+    // Erase (right-click)
+    if (wePaintTile === 0) {
+      const layer = weZoneData.layers.find(l => l.name === weCurLayer);
+      if (!layer) continue;
+      const oldTile = layer.data[cy * width + cx];
+      if (!oldTile) continue;
+      layer.data[cy * width + cx] = 0;
+      weSmartResolveNeighbors(cx, cy, oldTile);
+      dirty = true;
+      continue;
+    }
+    // Smart tile group paint
+    if (weSmartGroup) {
+      weSmartPaintCell(cx, cy, true);
+      dirty = true;
+      continue;
+    }
+    // Normal paint
+    const layer = weZoneData.layers.find(l => l.name === weCurLayer);
+    if (!layer) continue;
+    if (layer.data[cy * width + cx] === wePaintTile) continue;
+    layer.data[cy * width + cx] = wePaintTile;
+    dirty = true;
+  }
+
+  if (dirty) { weDirty = true; weDrawZone(); }
+}
+
+// ── Smart tile painting ────────────────────────────────────────────────────────
+// Bitmask: N=1, E=2, S=4, W=8
+const _PATCH9_MAP  = ['c','s','w','sw','n','n','nw','w','e','se','n','s','ne','e','n','c'];
+const _HSTRIP3_MAP = ['l','r','l','c'];   // indexed by (W?1:0)|(E?2:0)
+const _VSTRIP3_MAP = ['t','b','t','m'];   // indexed by (N?1:0)|(S?2:0)
+
+function weSmartSlot(group, mask) {
+  switch (group.type) {
+    case 'patch9':  return _PATCH9_MAP[mask];
+    case 'blob4':   return String(mask);
+    case 'hstrip3': return _HSTRIP3_MAP[(mask&8?1:0)|(mask&2?2:0)]; // W=8→1, E=2→2
+    case 'vstrip3': return _VSTRIP3_MAP[(mask&1?1:0)|(mask&4?2:0)]; // N=1→1, S=4→2
+    default: return 'c';
+  }
+}
+
+function weSmartFallback(group, slot) {
+  // Return the tile ID for this slot, falling back through sensible defaults
+  const t = group.tiles;
+  if (t[slot]) return t[slot];
+  const fallbacks = group.type === 'blob4'
+    ? ['15','0']
+    : ['c','m','l','t','r','b','nw','n','ne','w','e','sw','s','se'];
+  for (const fb of fallbacks) if (t[fb]) return t[fb];
+  // Final fallback: baseTile (single isolated placement)
+  return group.baseTile || Object.values(t).find(v => v > 0) || 0;
+}
+
+function weSmartGetLayer(group) {
+  return weZoneData.layers.find(l => l.name === (weCurLayer || group.layer || 'ground'));
+}
+
+function weSmartGroupIds(group) {
+  const ids = new Set(Object.values(group.tiles).filter(v => v > 0));
+  if (group.baseTile) ids.add(group.baseTile);
+  return ids;
+}
+
+function weSmartResolveCell(layer, tx, ty, group, groupIds) {
+  const { width, height } = weZoneData;
+  const N = ty > 0        && groupIds.has(layer.data[(ty-1)*width+tx])   ? 1 : 0;
+  const E = tx < width-1  && groupIds.has(layer.data[ty*width+(tx+1)])   ? 2 : 0;
+  const S = ty < height-1 && groupIds.has(layer.data[(ty+1)*width+tx])   ? 4 : 0;
+  const W = tx > 0        && groupIds.has(layer.data[ty*width+(tx-1)])   ? 8 : 0;
+  const tileId = weSmartFallback(group, weSmartSlot(group, N|E|S|W));
+  if (tileId) layer.data[ty*width+tx] = tileId;
+}
+
+function weSmartPaintCell(tx, ty, _noRedraw = false) {
+  const group  = weSmartGroup;
+  const layer  = weSmartGetLayer(group);
   if (!layer) return;
-  const idx = ty * width + tx;
-  if (layer.data[idx] === wePaintTile) return;
-  layer.data[idx] = wePaintTile;
+  const groupIds = weSmartGroupIds(group);
+  const anyTile  = weSmartFallback(group, 'c');
+  if (!anyTile) return;
+
+  // Place a provisional tile so neighbors can detect this cell as part of the group
+  layer.data[ty * weZoneData.width + tx] = anyTile;
+  // Update groupIds to include any tile that was placed (anyTile may be a slot variant)
+  const allGroupIds = weSmartGroupIds(group); // re-derive after provisional paint
+
+  // Resolve this cell + 4 cardinal neighbors
+  const { width, height } = weZoneData;
+  const cells = [[tx,ty],[tx,ty-1],[tx+1,ty],[tx,ty+1],[tx-1,ty]];
+  for (const [nx,ny] of cells) {
+    if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+    if (!allGroupIds.has(layer.data[ny*width+nx]) && !(nx===tx&&ny===ty)) continue;
+    weSmartResolveCell(layer, nx, ny, group, allGroupIds);
+  }
+
   weDirty = true;
-  weDrawZone();
+  if (!_noRedraw) weDrawZone();
+}
+
+function weSmartResolveNeighbors(tx, ty, erasedTileId) {
+  if (!weZoneData || !erasedTileId) return;
+  for (const group of (smartDb||[])) {
+    const groupIds = weSmartGroupIds(group);
+    if (!groupIds.has(erasedTileId)) continue;
+    const layer = weSmartGetLayer(group);
+    if (!layer) continue;
+    const { width, height } = weZoneData;
+    for (const [nx,ny] of [[tx,ty-1],[tx+1,ty],[tx,ty+1],[tx-1,ty]]) {
+      if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+      if (groupIds.has(layer.data[ny*width+nx]))
+        weSmartResolveCell(layer, nx, ny, group, groupIds);
+    }
+    break; // tile IDs should belong to one group only
+  }
 }
 
 // ── Tile copy / paste ─────────────────────────────────────────────────────────
@@ -2238,7 +2893,7 @@ function weDrawCopyOverlay(ctx) {
     const { w, h, layers } = _weClipboard;
     const TS = weZoneData.tileSize ?? 16;
     ctx.globalAlpha = 0.6;
-    for (const layerName of ['ground', 'objects', 'roof']) {
+    for (const layerName of ['ground', 'ground2', 'objects', 'roof']) {
       const srcLayer = layers[layerName];
       if (!srcLayer) continue;
       if (layerName === 'roof') ctx.globalAlpha = 0.35;
@@ -2293,7 +2948,7 @@ weCanvas.addEventListener('mousedown', e => {
       _weCopyDrawing.tx1 = tx; _weCopyDrawing.ty1 = ty;
       return;
     }
-    if (e.button === 2) { wePaintTile = 0; weBuildPalette(); }
+    if (e.button === 2) { wePaintTile = 0; weSmartGroup = null; weBuildPalette(); }
     wePainting = true;
     wePaintAt(e);
   } else {
@@ -3203,6 +3858,560 @@ async function charsDelete(name) {
       charsLoad();
     } else status(j.error, 'err');
   } catch(e) { status('Delete failed: ' + e.message, 'err'); }
+}
+
+async function tmdFlush() {
+  const sorted = [...GAME_TILES].sort((a, b) => a.id - b.id);
+  const d = await api('tiledefs', 'POST', { defs: sorted });
+  d.ok ? status('✓ tileDefs.js saved — restart server to apply in-game', 'ok')
+       : status('Save failed: ' + (d.error || ''), 'err');
+}
+
+// ────────────────────────────────────────────────────────
+// SMART TILES — shared data + tile-mapper integration
+// ────────────────────────────────────────────────────────
+let smartDb = null;          // array of group objects (null = not yet loaded)
+let _tmArmedSlot = null;     // slot key currently armed for pick-from-sheet (null = off)
+let _tmCurrentGroupId = null; // ID of smart group currently being edited (stable across slot reassignment)
+
+// Slot layouts per type
+const ST_SLOTS = {
+  hstrip3: ['l','c','r'],
+  vstrip3: ['t','m','b'],
+  patch9:  ['nw','n','ne','w','c','e','sw','s','se'],
+  blob4:   ['0','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15'],
+};
+const ST_LABELS = {
+  hstrip3: { l:'Left', c:'Center', r:'Right' },
+  vstrip3: { t:'Top', m:'Mid', b:'Bot' },
+  patch9:  { nw:'NW', n:'N', ne:'NE', w:'W', c:'C', e:'E', sw:'SW', s:'S', se:'SE' },
+};
+function stBlobLabel(mask) {
+  const dirs = [];
+  if (mask & 1) dirs.push('N'); if (mask & 2) dirs.push('E');
+  if (mask & 4) dirs.push('S'); if (mask & 8) dirs.push('W');
+  return dirs.length ? dirs.join('+') : '·';
+}
+
+// ── Shared load (used by tile mapper init + world editor init) ────────────────
+async function stLoad() {
+  smartDb = await api('smarttiles', 'GET');
+  if (!Array.isArray(smartDb)) smartDb = [];
+  weBuildPalette();
+}
+
+// ── Tile mapper integration ───────────────────────────────────────────────────
+function tmFindGroupForTile(tileId) {
+  // Check baseTile first (the palette/isolated tile), then slot tiles
+  return (smartDb||[]).find(g => g.baseTile === tileId || Object.values(g.tiles).includes(tileId));
+}
+
+function tmSheetIdxToTileId(sheetIdx) {
+  const entry = Object.entries(tileMap).find(([,v]) => v === sheetIdx);
+  return entry ? +entry[0] : null;
+}
+
+function tmRenderSmartSection() {
+  const el = document.getElementById('tm-smart-section');
+  if (!el) return;
+  if (!selTile) { el.style.display = 'none'; return; }
+
+  el.style.display = 'block';
+  // Prefer stable group-ID lookup; fall back to tile-scan for initial selection
+  const group = (_tmCurrentGroupId && (smartDb||[]).find(g => g.id === _tmCurrentGroupId))
+             || tmFindGroupForTile(selTile);
+  if (group) _tmCurrentGroupId = group.id; // keep in sync
+
+  if (!group) {
+    el.innerHTML = `
+      <div style="padding:8px 10px;font-size:11px;color:#8b949e">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" onchange="tmCreateSmartGroup(${selTile},this.checked)">
+          <span>✦ Smart Tile Group</span>
+          <span style="font-size:10px;color:#444">— auto-arrange by neighbors</span>
+        </label>
+      </div>`;
+    return;
+  }
+
+  const typeOpts = ['hstrip3','vstrip3','patch9','blob4']
+    .map(t => `<option${group.type===t?' selected':''}>${t}</option>`).join('');
+  const layerOpts = ['ground','ground2','objects']
+    .map(t => `<option${(group.layer||'ground')===t?' selected':''}>${t}</option>`).join('');
+  const armedMsg = _tmArmedSlot
+    ? `<span style="color:#58a6ff;font-weight:600">Click a tile on the sheet → slot "${_tmArmedSlot}"</span>`
+    : `<span style="color:#555">Click a slot, then click sheet to assign</span>`;
+
+  el.innerHTML = `
+    <div style="padding:8px 10px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px">
+          <input type="checkbox" checked onchange="tmRemoveSmartGroup('${group.id}',this.checked)">
+          <span style="font-weight:600;color:#58a6ff">✦ Smart</span>
+        </label>
+        <input value="${esc(group.name)}" oninput="(smartDb.find(g=>g.id==='${group.id}')||{}).name=this.value"
+          style="flex:1;min-width:60px;background:#0d1117;border:1px solid #30363d;color:#e6edf3;
+                 padding:2px 6px;border-radius:3px;font:inherit;font-size:11px">
+        <select onchange="tmSmartTypeChange('${group.id}',this.value)"
+          style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;
+                 padding:2px 4px;border-radius:3px;font:inherit;font-size:10px">${typeOpts}</select>
+        <select onchange="(smartDb.find(g=>g.id==='${group.id}')||{}).layer=this.value"
+          style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;
+                 padding:2px 4px;border-radius:3px;font:inherit;font-size:10px">${layerOpts}</select>
+      </div>
+      ${group.baseTile ? `<div style="font-size:10px;color:#8b949e;margin-bottom:6px">
+        Base tile #${group.baseTile} — assign its sprite via the sheet (single/isolated placement).
+        Slot tiles below are the connected variants.</div>` : ''}
+      ${tmSmartSlotsHtml(group)}
+      <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <button class="btn primary" style="font-size:11px;padding:3px 10px" onclick="tmSmartSave()">💾 Save</button>
+        <span style="font-size:10px">${armedMsg}</span>
+      </div>
+    </div>`;
+}
+
+function tmSmartSlotsHtml(group) {
+  const box = (slot, label) => {
+    const tid = group.tiles[slot] || 0;
+    const armed = _tmArmedSlot === slot;
+    const spr = tid && tileMap[tid]!=null ? sprStyle(tileMap[tid], 20)
+              : tid ? `background:${TILE_COLORS[tid]||'#555'}` : 'background:#111;border:1px dashed #333';
+    const nm = tid ? (GAME_TILES.find(t=>t.id===tid)?.name || '#'+tid) : '—';
+    return `<div onclick="tmArmSlot('${slot}')" title="${slot}${tid?' → '+nm:' (empty)'}"
+      style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 3px;
+             background:${armed?'#0d2a4a':'#0d1117'};
+             border:1.5px solid ${armed?'#58a6ff':tid?'#30363d':'#21262d'};
+             border-radius:3px;cursor:pointer;min-width:42px">
+      <div class="spr" style="${spr};width:20px;height:20px"></div>
+      <span style="font-size:8px;font-weight:600;color:${armed?'#58a6ff':'#8b949e'}">${label}</span>
+    </div>`;
+  };
+
+  if (group.type === 'hstrip3')
+    return `<div style="display:flex;gap:4px">${['l','c','r'].map(s=>box(s,ST_LABELS.hstrip3[s])).join('')}</div>`;
+  if (group.type === 'vstrip3')
+    return `<div style="display:flex;gap:4px">${['t','m','b'].map(s=>box(s,ST_LABELS.vstrip3[s])).join('')}</div>`;
+  if (group.type === 'patch9') {
+    const rows = [['nw','n','ne'],['w','c','e'],['sw','s','se']];
+    return `<div style="display:inline-flex;flex-direction:column;gap:3px">
+      ${rows.map(row=>`<div style="display:flex;gap:3px">${row.map(s=>box(s,ST_LABELS.patch9[s])).join('')}</div>`).join('')}
+    </div>`;
+  }
+  if (group.type === 'blob4') {
+    const rows = [[0,1,2,3],[4,5,6,7],[8,9,10,11],[12,13,14,15]];
+    return `<div style="display:inline-flex;flex-direction:column;gap:2px">
+      ${rows.map(row=>`<div style="display:flex;gap:2px">${row.map(m=>box(String(m),stBlobLabel(m))).join('')}</div>`).join('')}
+    </div>`;
+  }
+  return '';
+}
+
+function tmArmSlot(slot) {
+  _tmArmedSlot = (_tmArmedSlot === slot) ? null : slot;
+  tmRenderSmartSection();
+  drawSheet(); // redraw to show pick mode overlay
+}
+
+function tmCreateSmartGroup(tileId, create) {
+  if (!create) return;
+  if (!smartDb) smartDb = [];
+  const id = 'sg_' + Date.now();
+  const gt = GAME_TILES.find(t => t.id === tileId);
+  smartDb.push({ id, name: gt?.name || 'Group', type: 'patch9', baseTile: tileId, layer: 'ground', tiles: {} });
+  _tmArmedSlot = null;
+  _tmCurrentGroupId = id;
+  tmRenderSmartSection();
+}
+
+function tmSmartTypeChange(groupId, newType) {
+  const g = (smartDb||[]).find(g => g.id === groupId);
+  if (!g) return;
+  g.type = newType;
+  _tmArmedSlot = null;
+  tmRenderSmartSection();
+}
+
+function tmRemoveSmartGroup(groupId, checked) {
+  if (checked) return;
+  if (!confirm('Remove this tile from its smart group? (Deletes the whole group)')) return;
+  smartDb = (smartDb||[]).filter(g => g.id !== groupId);
+  _tmArmedSlot = null;
+  if (_tmCurrentGroupId === groupId) _tmCurrentGroupId = null;
+  tmRenderSmartSection();
+  weBuildPalette();
+}
+
+async function tmSmartSave() {
+  const d = await api('smarttiles', 'POST', { groups: smartDb || [] });
+  if (d.ok) { status('✓ Smart group saved', 'ok'); weBuildPalette(); }
+  else status('Save failed', 'err');
+}
+
+
+// ────────────────────────────────────────────────────────
+// QUEST EDITOR
+// ────────────────────────────────────────────────────────
+let _selQuestId = null;
+
+function qFilter() {
+  const q = document.getElementById('q-search').value.toLowerCase();
+  const t = document.getElementById('q-type').value;
+  qBuildRows(Object.values(questDb||{}).filter(qst =>
+    (!q || qst.name?.toLowerCase().includes(q) || qst.id?.includes(q)) &&
+    (!t || (t==='main' ? qst.id?.startsWith('mq') : qst.id?.startsWith('sq')))));
+}
+
+function qBuildRows(list) {
+  list = list ?? Object.values(questDb||{});
+  document.getElementById('q-rows').innerHTML = list.length
+    ? list.map(qst => {
+        const isMQ = qst.id?.startsWith('mq');
+        return `<div class="ed-row" data-id="${qst.id}" onclick="qEdit('${qst.id}')">
+          <div class="ed-rid">${qst.id}</div>
+          <div class="ed-rname">${qst.name}</div>
+          <span class="badge" style="background:${isMQ?'#1f2d3d':'#2d1f3d'};color:${isMQ?'#58a6ff':'#a371f7'}">${isMQ?'Main':'Side'}</span>
+        </div>`;
+      }).join('')
+    : '<div class="empty">No quests</div>';
+}
+
+function qEdit(id) {
+  _selQuestId = id;
+  document.querySelectorAll('#q-rows .ed-row').forEach(r => r.classList.toggle('sel', r.dataset.id===id));
+  const qst = questDb[id]; if (!qst) return;
+  const stagesHtml = (qst.stages||[]).map((s,si) => qStageHtml(s, si)).join('');
+  document.getElementById('q-form').innerHTML = `
+    <div class="f-title">${qst.name} <span style="color:#8b949e;font-weight:400;font-size:11px">(${id})</span></div>
+    <div class="f-grid">
+      <div class="field f-full"><label>Name</label><input id="qf-name" value="${esc(qst.name)}"></div>
+      <div class="field f-full"><label>Description</label><textarea id="qf-desc" style="min-height:70px">${esc(qst.description||'')}</textarea></div>
+      <div class="field"><label>Giver NPC ID</label><input id="qf-giver" value="${esc(qst.giverNpcId||'')}" list="dev-npc-ids"></div>
+      <div class="field" style="justify-content:flex-end;flex-direction:row;align-items:center;gap:6px">
+        <input type="checkbox" id="qf-repeatable"${qst.repeatable?' checked':''}>
+        <label for="qf-repeatable" style="text-transform:none;font-size:12px;color:#e6edf3;cursor:pointer">Repeatable (can be accepted again after completion)</label>
+      </div>
+    </div>
+    <div class="sec" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Stages</span>
+      <button class="btn" style="font-size:10px;padding:2px 8px" onclick="qAddStage('${id}')">+ Stage</button>
+    </div>
+    <div id="qf-stages">${stagesHtml}</div>
+    <div class="f-actions">
+      <button class="btn primary" onclick="qSave('${id}')">💾 Save Quest</button>
+    </div>`;
+}
+
+function qStageHtml(s, si) {
+  const objsHtml = (s.objectives||[]).map((o,oi) => qObjHtml(o, si, oi)).join('');
+  return `<div class="q-stage" data-si="${si}" style="border:1px solid #30363d;border-radius:6px;padding:10px;margin-bottom:8px;background:#0d1117">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-size:11px;color:#8b949e;font-weight:600">Stage ${si+1}</span>
+      <button class="btn" style="font-size:10px;padding:2px 6px;color:#f85149" onclick="qRemoveStage(${si})">✕ Remove</button>
+    </div>
+    <div class="f-grid" style="margin-bottom:6px">
+      <div class="field f-full"><label>Stage Title</label><input class="qs-title" value="${esc(s.title||'')}" data-si="${si}"></div>
+      <div class="field"><label>Check-in NPC ID</label><input class="qs-npc" value="${esc(s.npcId||'')}" data-si="${si}" list="dev-npc-ids"></div>
+      <div class="field"><label>Escort NPC ID</label><input class="qs-escort" value="${esc(s.escortNpcId||'')}" data-si="${si}" list="dev-npc-ids"></div>
+    </div>
+    <div class="sec" style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+      <span>Objectives</span>
+      <button class="btn" style="font-size:10px;padding:2px 6px" onclick="qAddObj(${si})">+ Obj</button>
+    </div>
+    <div id="qf-objs-${si}">${objsHtml}</div>
+    <div class="sec">Reward</div>
+    <div class="f-grid">
+      <div class="field"><label>XP</label><input class="qs-rxp" type="number" value="${s.reward?.xp||0}" data-si="${si}"></div>
+      <div class="field"><label>Gold</label><input class="qs-rgold" type="number" value="${s.reward?.gold||0}" data-si="${si}"></div>
+      <div class="field f-full"><label>Items (itemId:qty, …)</label>
+        <input class="qs-ritems" value="${esc(Object.entries(s.reward?.items||{}).map(([k,v])=>k+':'+v).join(', '))}" data-si="${si}">
+      </div>
+    </div>
+  </div>`;
+}
+
+function qObjHtml(o, si, oi) {
+  const types = ['reach','kill','fetch','talk','puzzle','escort'];
+  const tSel = types.map(t=>`<option${o.type===t?' selected':''}>${t}</option>`).join('');
+  return `<div class="q-obj" data-si="${si}" data-oi="${oi}" style="display:grid;grid-template-columns:100px 1fr 60px auto;gap:4px;align-items:center;margin-bottom:4px">
+    <select class="qo-type" data-si="${si}" data-oi="${oi}" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:3px 5px;border-radius:4px;font:inherit;font-size:11px">${tSel}</select>
+    <input class="qo-label" placeholder="Label" value="${esc(o.label||'')}" data-si="${si}" data-oi="${oi}" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:3px 6px;border-radius:4px;font:inherit;font-size:11px">
+    <input class="qo-id" placeholder="ID" value="${esc(o.enemyId||o.enemyIds?.join(',')||o.itemId||o.npcId||o.zoneId||o.puzzleId||'')}" data-si="${si}" data-oi="${oi}" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:3px 6px;border-radius:4px;font:inherit;font-size:11px" title="enemyId / enemyIds(comma) / itemId / npcId / zoneId / puzzleId">
+    <input class="qo-count" type="number" placeholder="Count" value="${o.count||''}" data-si="${si}" data-oi="${oi}" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:3px 6px;border-radius:4px;font:inherit;font-size:11px;width:55px">
+    <button class="btn" style="font-size:10px;padding:2px 5px;color:#f85149" onclick="qRemoveObj(${si},${oi})">✕</button>
+  </div>`;
+}
+
+function qAddStage(id) {
+  const qst = questDb[id]; if (!qst) return;
+  qst.stages.push({ title: 'New Stage', objectives: [], reward: { xp: 0 } });
+  qEdit(id);
+}
+
+function qRemoveStage(si) {
+  const qst = questDb[_selQuestId]; if (!qst) return;
+  qst.stages.splice(si, 1);
+  qEdit(_selQuestId);
+}
+
+function qAddObj(si) {
+  const qst = questDb[_selQuestId]; if (!qst) return;
+  qst.stages[si].objectives.push({ type: 'kill', label: 'New objective' });
+  qEdit(_selQuestId);
+}
+
+function qRemoveObj(si, oi) {
+  const qst = questDb[_selQuestId]; if (!qst) return;
+  qst.stages[si].objectives.splice(oi, 1);
+  qEdit(_selQuestId);
+}
+
+function qReadStages() {
+  const stages = [];
+  document.querySelectorAll('#qf-stages .q-stage').forEach((el, si) => {
+    const title   = el.querySelector('.qs-title')?.value||'';
+    const npcId   = el.querySelector('.qs-npc')?.value||'';
+    const escort  = el.querySelector('.qs-escort')?.value||'';
+    const rxp     = +el.querySelector('.qs-rxp')?.value||0;
+    const rgold   = +el.querySelector('.qs-rgold')?.value||0;
+    const ritemsStr = el.querySelector('.qs-ritems')?.value||'';
+    const ritems  = {};
+    for (const part of ritemsStr.split(',').map(s=>s.trim()).filter(Boolean)) {
+      const [k,v] = part.split(':').map(s=>s.trim());
+      if (k) ritems[k] = +v||1;
+    }
+    const objectives = [];
+    el.querySelectorAll('.q-obj').forEach(oEl => {
+      const type  = oEl.querySelector('.qo-type')?.value||'kill';
+      const label = oEl.querySelector('.qo-label')?.value||'';
+      const rawId = oEl.querySelector('.qo-id')?.value||'';
+      const count = +oEl.querySelector('.qo-count')?.value||undefined;
+      const obj = { type, label };
+      if (count) obj.count = count;
+      if (rawId) {
+        if (type==='kill' && rawId.includes(',')) obj.enemyIds = rawId.split(',').map(s=>s.trim());
+        else if (type==='kill') obj.enemyId = rawId;
+        else if (type==='fetch') obj.itemId = rawId;
+        else if (type==='reach') obj.zoneId = rawId;
+        else if (type==='talk') obj.npcId = rawId;
+        else if (type==='puzzle') obj.puzzleId = rawId;
+      }
+      objectives.push(obj);
+    });
+    const stage = { title, objectives };
+    if (npcId) stage.npcId = npcId;
+    if (escort) stage.escortNpcId = escort;
+    const reward = {};
+    if (rxp) reward.xp = rxp;
+    if (rgold) reward.gold = rgold;
+    if (Object.keys(ritems).length) reward.items = ritems;
+    stage.reward = reward;
+    stages.push(stage);
+  });
+  return stages;
+}
+
+async function qSave(id) {
+  const qst = {...questDb[id]};
+  qst.name        = v('qf-name');
+  qst.description = v('qf-desc');
+  qst.giverNpcId  = v('qf-giver')||undefined;
+  const repCb = document.getElementById('qf-repeatable');
+  if (repCb?.checked) qst.repeatable = true; else delete qst.repeatable;
+  qst.stages = qReadStages();
+  questDb[id] = qst;
+  const d = await api('quests','POST',{db:questDb});
+  d.ok ? status('✓ quests.js saved!','ok') : status('Save failed: '+(d.error||''),'err');
+  qBuildRows();
+}
+
+// ────────────────────────────────────────────────────────
+// DIALOGUE EDITOR
+// ────────────────────────────────────────────────────────
+let _selTreeId = null;
+let _selNodeId = null;
+
+function dlFilter() {
+  const q = document.getElementById('dl-search').value.toLowerCase();
+  dlBuildRows(Object.keys(dialogueDb||{}).filter(id => !q || id.includes(q)));
+}
+
+function dlBuildRows(keys) {
+  keys = keys ?? Object.keys(dialogueDb||{});
+  document.getElementById('dl-rows').innerHTML = keys.length
+    ? keys.map(id => `<div class="ed-row" data-id="${id}" onclick="dlSelectTree('${id}')">
+        <div class="ed-rid" style="width:100%;font-size:11px">${id}</div>
+      </div>`).join('')
+    : '<div class="empty">No trees</div>';
+}
+
+function dlSelectTree(id) {
+  _selTreeId = id; _selNodeId = null;
+  document.querySelectorAll('#dl-rows .ed-row').forEach(r => r.classList.toggle('sel', r.dataset.id===id));
+  document.getElementById('dl-tree-label').textContent = id;
+  dlBuildNodeRows();
+  document.getElementById('dl-form').innerHTML = '<div class="empty">Select a node to edit</div>';
+}
+
+function dlBuildNodeRows() {
+  const tree = dialogueDb?.[_selTreeId]; if (!tree) return;
+  const nodeIds = Object.keys(tree.nodes||{});
+  document.getElementById('dl-node-rows').innerHTML = nodeIds.length
+    ? nodeIds.map(nid => `<div class="ed-row" data-nid="${nid}" onclick="dlEditNode('${nid}')" style="padding:5px 8px">
+        <div style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nid}</div>
+        ${tree.root===nid?'<span style="font-size:9px;color:#58a6ff;border:1px solid #1f6feb;border-radius:3px;padding:1px 4px">root</span>':''}
+      </div>`).join('')
+    : '<div class="empty" style="font-size:11px">No nodes</div>';
+}
+
+function dlEditNode(nid) {
+  _selNodeId = nid;
+  document.querySelectorAll('#dl-node-rows .ed-row').forEach(r => r.classList.toggle('sel', r.dataset.nid===nid));
+  const tree = dialogueDb?.[_selTreeId]; if (!tree) return;
+  const node = tree.nodes[nid]; if (!node) return;
+  const choicesHtml = (node.choices||[]).map((c,ci) => dlChoiceHtml(c, ci)).join('');
+  document.getElementById('dl-form').innerHTML = `
+    <div class="f-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Node: <span style="color:#58a6ff">${nid}</span></span>
+      <div style="display:flex;gap:6px">
+        ${tree.root!==nid?`<button class="btn" style="font-size:10px;padding:2px 8px" onclick="dlSetRoot('${nid}')">Set as root</button>`:''}
+        <button class="btn" style="font-size:10px;padding:2px 8px;color:#f85149" onclick="dlRemoveNode('${nid}')">✕ Delete node</button>
+      </div>
+    </div>
+    <div class="f-grid">
+      <div class="field"><label>Speaker</label><input id="dlf-speaker" value="${esc(node.speaker||'')}"></div>
+      <div class="field f-full"><label>Text</label><textarea id="dlf-text" style="min-height:80px">${esc(node.text||'')}</textarea></div>
+    </div>
+    <div class="sec" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Choices</span>
+      <button class="btn" style="font-size:10px;padding:2px 8px" onclick="dlAddChoice()">+ Choice</button>
+    </div>
+    <div id="dlf-choices">${choicesHtml}</div>
+    <div class="f-actions">
+      <button class="btn primary" onclick="dlSaveNode('${nid}')">💾 Save Node</button>
+    </div>`;
+}
+
+const DL_ACTIONS = ['close','goto','open_shop','rest','quest_offer','quest_check','start_brawl','join_party','set_npc_dialogue','vouch_others'];
+
+function dlChoiceHtml(c, ci) {
+  const actSel = DL_ACTIONS.map(a=>`<option${c.action===a?' selected':''}>${a}</option>`).join('');
+  return `<div class="dl-choice" data-ci="${ci}" style="border:1px solid #21262d;border-radius:5px;padding:8px;margin-bottom:6px">
+    <div style="display:flex;gap:4px;margin-bottom:4px">
+      <div class="field" style="flex:2"><label>Choice Text</label><input class="dlc-text" value="${esc(c.text||'')}"></div>
+      <div class="field" style="flex:1;min-width:0">
+        <label>Action</label>
+        <select class="dlc-action" onchange="dlChoiceActionChange(this,${ci})" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:4px 5px;border-radius:4px;font:inherit;font-size:12px;width:100%">${actSel}</select>
+      </div>
+      <div style="align-self:flex-end"><button class="btn" style="font-size:10px;padding:3px 6px;color:#f85149" onclick="dlRemoveChoice(${ci})">✕</button></div>
+    </div>
+    <div id="dlc-extra-${ci}">${dlChoiceExtraHtml(c, ci)}</div>
+  </div>`;
+}
+
+function dlChoiceExtraHtml(c, ci) {
+  const action = c.action||'close';
+  const inp = (id,label,val,extra='') => `<div class="field"><label>${label}</label><input id="dlc-${id}-${ci}" value="${esc(val||'')}" ${extra}></div>`;
+  if (action==='goto')
+    return `<div class="f-grid">${inp('target','Target Node',c.target)}</div>`;
+  if (action==='quest_offer'||action==='quest_check')
+    return `<div class="f-grid">${inp('questid','Quest ID',c.questId)}</div>`;
+  if (action==='set_npc_dialogue')
+    return `<div class="f-grid">${inp('npcid','NPC ID',c.npcId)}${inp('treeid','Tree ID',c.treeId)}${inp('target','Goto Node (opt)',c.target)}</div>`;
+  return '';
+}
+
+function dlChoiceActionChange(sel, ci) {
+  const choices = _dlReadChoices();
+  if (choices[ci]) choices[ci].action = sel.value;
+  document.getElementById('dlc-extra-'+ci).innerHTML = dlChoiceExtraHtml(choices[ci]||{action:sel.value}, ci);
+}
+
+function _dlReadChoices() {
+  const choices = [];
+  document.querySelectorAll('#dlf-choices .dl-choice').forEach((el, ci) => {
+    const text   = el.querySelector('.dlc-text')?.value||'';
+    const action = el.querySelector('.dlc-action')?.value||'close';
+    const c = { text, action };
+    if (action==='goto')
+      c.target = document.getElementById('dlc-target-'+ci)?.value||'';
+    else if (action==='quest_offer'||action==='quest_check')
+      c.questId = document.getElementById('dlc-questid-'+ci)?.value||'';
+    else if (action==='set_npc_dialogue') {
+      c.npcId  = document.getElementById('dlc-npcid-'+ci)?.value||'';
+      c.treeId = document.getElementById('dlc-treeid-'+ci)?.value||'';
+      const tgt = document.getElementById('dlc-target-'+ci)?.value||'';
+      if (tgt) c.target = tgt;
+    }
+    choices.push(c);
+  });
+  return choices;
+}
+
+function dlAddChoice() {
+  const tree = dialogueDb?.[_selTreeId]; if (!tree) return;
+  const node = tree.nodes[_selNodeId]; if (!node) return;
+  node.choices = _dlReadChoices();
+  node.choices.push({ text: 'New choice', action: 'close' });
+  dlEditNode(_selNodeId);
+}
+
+function dlRemoveChoice(ci) {
+  const tree = dialogueDb?.[_selTreeId]; if (!tree) return;
+  const node = tree.nodes[_selNodeId]; if (!node) return;
+  node.choices = _dlReadChoices();
+  node.choices.splice(ci, 1);
+  dlEditNode(_selNodeId);
+}
+
+function dlSaveNode(nid) {
+  const tree = dialogueDb?.[_selTreeId]; if (!tree) return;
+  const node = tree.nodes[nid]; if (!node) return;
+  node.speaker  = v('dlf-speaker')||null;
+  node.text     = v('dlf-text');
+  node.choices  = _dlReadChoices();
+  dlSaveTree();
+}
+
+function dlSetRoot(nid) {
+  const tree = dialogueDb?.[_selTreeId]; if (!tree) return;
+  tree.root = nid;
+  dlBuildNodeRows();
+  dlEditNode(nid);
+  dlSaveTree();
+}
+
+function dlRemoveNode(nid) {
+  if (!confirm(`Delete node "${nid}"?`)) return;
+  const tree = dialogueDb?.[_selTreeId]; if (!tree) return;
+  delete tree.nodes[nid];
+  _selNodeId = null;
+  dlBuildNodeRows();
+  document.getElementById('dl-form').innerHTML = '<div class="empty">Select a node to edit</div>';
+  dlSaveTree();
+}
+
+function dlAddNode() {
+  const tree = dialogueDb?.[_selTreeId];
+  if (!tree) { status('Select a dialogue tree first','err'); return; }
+  const nid = prompt('New node ID:');
+  if (!nid || tree.nodes[nid]) return;
+  tree.nodes[nid] = { speaker: null, text: '', choices: [] };
+  dlBuildNodeRows();
+  dlEditNode(nid);
+}
+
+function dlAddTree() {
+  const id = prompt('New dialogue tree ID (e.g. npc_name_default):');
+  if (!id || dialogueDb[id]) return;
+  dialogueDb[id] = { root: 'greeting', nodes: { greeting: { speaker: null, text: '', choices: [{ text: 'Goodbye.', action: 'close' }] } } };
+  dlBuildRows();
+  dlSelectTree(id);
+}
+
+async function dlSaveTree() {
+  const d = await api('dialogue','POST',{db:dialogueDb});
+  d.ok ? status('✓ dialogue/index.js saved!','ok') : status('Save failed: '+(d.error||''),'err');
+  dlBuildRows();
 }
 
 // ────────────────────────────────────────────────────────

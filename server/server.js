@@ -39,13 +39,10 @@ function evalDataFile(content) {
   return new Function(cleaned + '\nreturn ' + (cleaned.match(/^const\s+(\w+)/m)?.[1] ?? 'undefined') + ';')();
 }
 
-function genTileMapJs(map) {
-  const NAMES = {1:'GRASS',2:'DIRT',3:'STONE_FLOOR',4:'WOOD_FLOOR',5:'WATER',6:'SAND',
-    7:'SWAMP',8:'DUNGEON_FLOOR',9:'PATH',10:'WALL_STONE',11:'WALL_WOOD',12:'TREE',
-    13:'TREE_TOP',14:'BUSH',15:'FENCE',16:'DOOR_CLOSED',17:'DOOR_OPEN',18:'CHEST',
-    19:'SIGN',20:'TORCH',21:'STAIRS_DOWN',22:'STAIRS_UP',23:'PRESSURE_PLATE',
-    24:'GATE_CLOSED',25:'GATE_OPEN',26:'WATER_DEEP',27:'CAMPFIRE',28:'BARREL',
-    29:'TABLE',30:'BED',40:'ROOF_THATCH',41:'ROOF_STONE'};
+function genTileMapJs(map, tileDefs = []) {
+  // Build NAMES from tileDefs if provided, fall back to id_N
+  const NAMES = {};
+  for (const t of tileDefs) NAMES[t.id] = t.name;
   const entries = Object.entries(map)
     .sort(([a],[b]) => +a - +b)
     .map(([id, idx]) => {
@@ -127,6 +124,22 @@ function genLootTableJs(db) {
   return `// Shared loot tables — assign to enemies via lootTableId.\n// Individual enemy dropTable entries stack on top of the shared table.\nexport const LOOT_TABLE_DB = ${JSON.stringify(db, null, 2)};\n`;
 }
 
+function genQuestJs(db) {
+  return `// Auto-saved by RPG dev tools\nexport const QUEST_DB = ${JSON.stringify(db, null, 2)};\n`;
+}
+
+function genDialogueJs(db) {
+  return `// Auto-saved by RPG dev tools\nexport const DIALOGUE_DB = ${JSON.stringify(db, null, 2)};\n`;
+}
+
+function genSmartTilesJs(groups) {
+  return `// Auto-saved by RPG dev tools\n// Smart tile groups — sets of tile variants that auto-arrange based on neighbors.\nexport const SMART_TILE_GROUPS = ${JSON.stringify(groups, null, 2)};\n`;
+}
+
+function genTileDefsJs(defs) {
+  return `// Auto-saved by RPG dev tools\n// Single source of truth for tile type definitions.\n// id: unique tile ID (0 = empty/none)\n// name: UPPER_SNAKE_CASE constant name used in code as TILE.NAME\n// cat: 'terrain' | 'wall' | 'prop' | 'door' | 'special' | 'roof'\n// blocking: true = impassable on the objects layer\nexport const TILE_DEFS = ${JSON.stringify(defs, null, 2)};\n`;
+}
+
 async function handleDevApi(req, res) {
   const urlPath = req.url.split('?')[0];
   const api = urlPath.slice('/dev/api/'.length);
@@ -146,7 +159,9 @@ async function handleDevApi(req, res) {
 
     } else if (api === 'tilemap' && req.method === 'POST') {
       const { map } = await readBody(req);
-      await writeFile(join(DATA_DIR, 'kenneyTileMap.js'), genTileMapJs(map), 'utf8');
+      let tileDefs = [];
+      try { const src = await readFile(join(DATA_DIR, 'tileDefs.js'), 'utf8'); tileDefs = evalDataFile(src); } catch {}
+      await writeFile(join(DATA_DIR, 'kenneyTileMap.js'), genTileMapJs(map, tileDefs), 'utf8');
       send({ ok: true });
 
     // ── items ──
@@ -200,6 +215,72 @@ async function handleDevApi(req, res) {
       const { db } = await readBody(req);
       await writeFile(join(DATA_DIR, 'lootTables.js'), genLootTableJs(db), 'utf8');
       send({ ok: true });
+
+    // ── quests ──
+    } else if (api === 'quests' && req.method === 'GET') {
+      const src = await readFile(join(DATA_DIR, 'quests.js'), 'utf8');
+      send(evalDataFile(src));
+
+    } else if (api === 'quests' && req.method === 'POST') {
+      const { db } = await readBody(req);
+      await writeFile(join(DATA_DIR, 'quests.js'), genQuestJs(db), 'utf8');
+      send({ ok: true });
+
+    // ── dialogue ──
+    } else if (api === 'dialogue' && req.method === 'GET') {
+      const src = await readFile(join(DATA_DIR, 'dialogue/index.js'), 'utf8');
+      send(evalDataFile(src));
+
+    } else if (api === 'dialogue' && req.method === 'POST') {
+      const { db } = await readBody(req);
+      await writeFile(join(DATA_DIR, 'dialogue/index.js'), genDialogueJs(db), 'utf8');
+      send({ ok: true });
+
+    // ── tile defs ──
+    } else if (api === 'tiledefs' && req.method === 'GET') {
+      const src = await readFile(join(DATA_DIR, 'tileDefs.js'), 'utf8');
+      send(evalDataFile(src));
+
+    } else if (api === 'tiledefs' && req.method === 'POST') {
+      const { defs } = await readBody(req);
+      await writeFile(join(DATA_DIR, 'tileDefs.js'), genTileDefsJs(defs), 'utf8');
+      send({ ok: true });
+
+    // ── smart tiles ──
+    } else if (api === 'smarttiles' && req.method === 'GET') {
+      try {
+        const src = await readFile(join(DATA_DIR, 'smartTiles.js'), 'utf8');
+        send(evalDataFile(src));
+      } catch { send([]); }
+
+    } else if (api === 'smarttiles' && req.method === 'POST') {
+      const { groups } = await readBody(req);
+      await writeFile(join(DATA_DIR, 'smartTiles.js'), genSmartTilesJs(groups), 'utf8');
+      send({ ok: true });
+
+    // ── remap tile IDs across all zone files ──
+    } else if (api === 'remap-tiles' && req.method === 'POST') {
+      const { map: rawMap } = await readBody(req);
+      // Convert string keys to numbers
+      const map = {};
+      for (const [k, v] of Object.entries(rawMap ?? {})) map[Number(k)] = Number(v);
+      const files = (await readdir(ZONES_DIR)).filter(f => f.endsWith('.js'));
+      let totalReplacements = 0;
+      for (const file of files) {
+        const src  = await readFile(join(ZONES_DIR, file), 'utf8');
+        const zone = evalZoneFile(src);
+        let replacements = 0;
+        for (const layer of (zone.layers ?? [])) {
+          if (!Array.isArray(layer.data)) continue;
+          for (let i = 0; i < layer.data.length; i++) {
+            const id = layer.data[i];
+            if (id && map[id] !== undefined) { layer.data[i] = map[id]; replacements++; }
+          }
+        }
+        await writeFile(join(ZONES_DIR, file), genZoneJs(zone), 'utf8');
+        totalReplacements += replacements;
+      }
+      send({ ok: true, zones: files.length, replacements: totalReplacements });
 
     // ── characters ──
     } else if (api === 'characters' && req.method === 'GET') {
@@ -300,6 +381,7 @@ async function handleDevApi(req, res) {
         spawnPoint: { x: Math.floor(width / 2) * tileSize, y: Math.floor(height / 2) * tileSize },
         layers: [
           { name: 'ground',  data: blank.slice() },
+          { name: 'ground2', data: new Array(width * height).fill(0) },
           { name: 'objects', data: new Array(width * height).fill(0) },
         ],
         transitions: [], spawns: [], npcs: [],
@@ -324,8 +406,17 @@ async function handleDevApi(req, res) {
         width: srcZone.width, height: srcZone.height, tileSize: srcZone.tileSize || 16,
         ambientLight: srcZone.ambientLight ?? 1,
         spawnPoint:   incSpawnPoint ? { ...srcZone.spawnPoint } : { x: Math.floor(srcZone.width/2) * (srcZone.tileSize||16), y: Math.floor(srcZone.height/2) * (srcZone.tileSize||16) },
-        layers:       incLayers ? srcZone.layers.map(l => ({ name: l.name, data: Array.from(l.data) }))
-                                : srcZone.layers.map(l => ({ name: l.name, data: l.name === 'ground' ? new Array(srcZone.width*srcZone.height).fill(1) : blank.slice() })),
+        layers: (() => {
+          // Ensure ground2 exists in source layers; insert after ground if missing
+          const srcLayers = srcZone.layers;
+          if (!srcLayers.find(l => l.name === 'ground2')) {
+            const gi = srcLayers.findIndex(l => l.name === 'ground');
+            srcLayers.splice(gi + 1, 0, { name: 'ground2', data: blank.slice() });
+          }
+          return incLayers
+            ? srcLayers.map(l => ({ name: l.name, data: Array.from(l.data) }))
+            : srcLayers.map(l => ({ name: l.name, data: l.name === 'ground' ? new Array(srcZone.width*srcZone.height).fill(1) : blank.slice() }));
+        })(),
         transitions:  incTransitions ? JSON.parse(JSON.stringify(srcZone.transitions ?? [])) : [],
         spawns:       incSpawns      ? JSON.parse(JSON.stringify(srcZone.spawns      ?? [])) : [],
         npcs:         incNpcs        ? JSON.parse(JSON.stringify(srcZone.npcs        ?? [])) : [],

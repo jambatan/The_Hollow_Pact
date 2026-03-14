@@ -1,50 +1,12 @@
 import { TILE_SIZE } from '../../shared/constants.js';
+import { TILE_DEFS } from '../data/tileDefs.js';
 
-// Tile IDs (0 = empty/transparent)
-export const TILE = {
-  NONE: 0,
-  // Ground
-  GRASS:        1,
-  DIRT:         2,
-  STONE_FLOOR:  3,
-  WOOD_FLOOR:   4,
-  WATER:        5,
-  SAND:         6,
-  SWAMP:        7,
-  DUNGEON_FLOOR:8,
-  PATH:         9,
-  // Objects / walls
-  WALL_STONE:   10,
-  WALL_WOOD:    11,
-  TREE:         12,
-  TREE_TOP:     13,
-  BUSH:         14,
-  FENCE:        15,
-  DOOR_CLOSED:  16,
-  DOOR_OPEN:    17,
-  CHEST:        18,
-  SIGN:         19,
-  TORCH:        20,
-  STAIRS_DOWN:  21,
-  STAIRS_UP:    22,
-  PRESSURE_PLATE:23,
-  GATE_CLOSED:  24,
-  GATE_OPEN:    25,
-  WATER_DEEP:   26,
-  CAMPFIRE:     27,
-  BARREL:       28,
-  TABLE:        29,
-  BED:          30,
-  // Roof
-  ROOF_THATCH:  40,
-  ROOF_STONE:   41,
-};
+// Tile IDs — built dynamically from tileDefs.js (0 = empty/transparent)
+export const TILE = { NONE: 0 };
+for (const t of TILE_DEFS) TILE[t.name] = t.id;
 
-// Which tiles block movement
-const BLOCKING = new Set([
-  TILE.WALL_STONE, TILE.WALL_WOOD, TILE.TREE, TILE.WATER, TILE.WATER_DEEP,
-  TILE.FENCE, TILE.DOOR_CLOSED, TILE.GATE_CLOSED, TILE.CHEST,
-]);
+// Blocking set — built dynamically from tileDefs.js
+const BLOCKING = new Set(TILE_DEFS.filter(t => t.blocking).map(t => t.id));
 
 export class TileMap {
   constructor(width, height, tileSize = TILE_SIZE) {
@@ -132,6 +94,20 @@ export const TILE_DRAW = {
   [TILE.BED]:          (ctx, x, y, s) => { ctx.fillStyle='#c8a0a0'; ctx.fillRect(x+1,y+2,s-2,s-3); ctx.fillStyle='#e0e0ff'; ctx.fillRect(x+1,y+2,s-2,6); },
   [TILE.ROOF_THATCH]:  (ctx, x, y, s) => { ctx.fillStyle='#c8a040'; ctx.fillRect(x,y,s,s); },
   [TILE.ROOF_STONE]:   (ctx, x, y, s) => { ctx.fillStyle='#7a7a8a'; ctx.fillRect(x,y,s,s); },
+  [TILE.ROCK]:         (ctx, x, y, s) => { ctx.fillStyle='#888'; ctx.beginPath(); ctx.ellipse(x+s/2,y+s/2+1,s/2-2,s/2-3,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#aaa'; ctx.fillRect(x+3,y+4,3,2); },
+  [TILE.PILLAR]:       (ctx, x, y, s) => { ctx.fillStyle='#999'; ctx.fillRect(x+3,y+1,s-6,s-2); ctx.fillStyle='#bbb'; ctx.fillRect(x+3,y+1,s-6,2); ctx.fillRect(x+3,y+s-3,s-6,2); },
+  [TILE.BOOKSHELF]:    (ctx, x, y, s) => { ctx.fillStyle='#6b4a1e'; ctx.fillRect(x+1,y+1,s-2,s-2); ctx.fillStyle='#c84'; ctx.fillRect(x+2,y+3,2,s-6); ctx.fillStyle='#4a8'; ctx.fillRect(x+5,y+3,2,s-6); ctx.fillStyle='#84c'; ctx.fillRect(x+8,y+3,2,s-6); ctx.fillStyle='#c44'; ctx.fillRect(x+11,y+3,2,s-6); },
+  [TILE.CRATE]:        (ctx, x, y, s) => { ctx.fillStyle='#c8a060'; ctx.fillRect(x+1,y+1,s-2,s-2); ctx.fillStyle='#a07840'; ctx.fillRect(x+1,y+s/2-1,s-2,2); ctx.fillRect(x+s/2-1,y+1,2,s-2); ctx.strokeStyle='#a07840'; ctx.lineWidth=1; ctx.strokeRect(x+1.5,y+1.5,s-3,s-3); },
+  [TILE.CARPET]:       (ctx, x, y, s) => { ctx.fillStyle='#8b2020'; ctx.fillRect(x,y,s,s); ctx.fillStyle='#c04040'; ctx.fillRect(x+2,y+2,s-4,s-4); ctx.fillStyle='#e06060'; ctx.fillRect(x+4,y+4,s-8,s-8); },
+  [TILE.MARBLE_FLOOR]: (ctx, x, y, s) => { ctx.fillStyle='#d8d8e8'; ctx.fillRect(x,y,s,s); ctx.fillStyle='#c0c0d0'; ctx.fillRect(x,y,s/2,s/2); ctx.fillRect(x+s/2,y+s/2,s/2,s/2); },
+  [TILE.GRASS_DARK]:   (ctx, x, y, s) => { ctx.fillStyle='#2d5a1b'; ctx.fillRect(x,y,s,s); ctx.fillStyle='#1a3a10'; ctx.fillRect(x+2,y+2,3,3); ctx.fillRect(x+9,y+6,3,3); },
+  [TILE.MUSHROOM]:     (ctx, x, y, s) => { ctx.fillStyle='#888'; ctx.fillRect(x+s/2-1,y+8,2,5); ctx.fillStyle='#c04040'; ctx.beginPath(); ctx.ellipse(x+s/2,y+8,4,4,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#e88'; ctx.fillRect(x+s/2-1,y+5,2,2); },
+  [TILE.FLOWER]:       (ctx, x, y, s) => { ctx.fillStyle='#2d5a1b'; ctx.fillRect(x+s/2-1,y+8,2,5); ctx.fillStyle='#f0d020'; ctx.beginPath(); ctx.ellipse(x+s/2,y+7,3,3,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#ffffff'; ctx.fillRect(x+s/2-3,y+5,2,2); ctx.fillRect(x+s/2+1,y+5,2,2); ctx.fillRect(x+s/2-1,y+3,2,2); },
+  [TILE.WELL]:         (ctx, x, y, s) => { ctx.fillStyle='#888'; ctx.beginPath(); ctx.arc(x+s/2,y+s/2,s/2-2,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#1a5aaa'; ctx.beginPath(); ctx.arc(x+s/2,y+s/2,s/2-4,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#777'; ctx.fillRect(x+s/2-1,y+1,2,3); },
+  [TILE.ANVIL]:        (ctx, x, y, s) => { ctx.fillStyle='#444'; ctx.fillRect(x+2,y+9,s-4,s-10); ctx.fillStyle='#555'; ctx.fillRect(x+1,y+6,s-2,4); ctx.fillStyle='#333'; ctx.fillRect(x+4,y+s-3,s-8,3); },
+  [TILE.GRAVE]:        (ctx, x, y, s) => { ctx.fillStyle='#888'; ctx.fillRect(x+4,y+4,s-8,s-6); ctx.fillRect(x+s/2-1,y+2,2,3); ctx.fillStyle='#777'; ctx.fillRect(x+5,y+8,s-10,2); },
+  [TILE.CAULDRON]:     (ctx, x, y, s) => { ctx.fillStyle='#333'; ctx.beginPath(); ctx.arc(x+s/2,y+s/2+2,s/2-3,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#4a8'; ctx.beginPath(); ctx.arc(x+s/2,y+s/2+1,s/2-5,0,Math.PI,true); ctx.fill(); ctx.fillStyle='#6bc'; ctx.fillRect(x+s/2-2,y+s/2-4,4,3); },
+  [TILE.LAVA]:         (ctx, x, y, s) => { ctx.fillStyle='#c83000'; ctx.fillRect(x,y,s,s); ctx.fillStyle='#ff8800'; ctx.fillRect(x+2,y+4,4,4); ctx.fillRect(x+8,y+8,4,4); ctx.fillRect(x+6,y+2,3,3); },
 };
 
 function drawGrid(ctx, x, y, s, color) {

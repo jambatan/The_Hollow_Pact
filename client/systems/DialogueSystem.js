@@ -13,10 +13,11 @@ export class DialogueSystem {
     events.on(EVENTS.DIALOGUE_END, this._end.bind(this));
   }
 
-  _start({ npc, player, treeId }) {
+  _start({ npc, player, treeId, questSystem }) {
     this.active = true;
     this.currentNPC    = npc;
     this.currentPlayer = player;
+    this._questSystem  = questSystem ?? null;
 
     // Lazy-load dialogue trees
     import('../data/dialogue/index.js').then(({ DIALOGUE_DB }) => {
@@ -37,6 +38,7 @@ export class DialogueSystem {
     this.currentNPC  = null;
     this.currentPlayer = null;
     this._tree = null;
+    this._questSystem = null;
   }
 
   selectChoice(index, questSystem) {
@@ -131,7 +133,7 @@ export class DialogueSystem {
       if (entity.distanceTo(player) > 28) continue;
 
       const treeId = entity.dialogueTree;
-      this.events.emit(EVENTS.DIALOGUE_START, { npc: entity, player, treeId });
+      this.events.emit(EVENTS.DIALOGUE_START, { npc: entity, player, treeId, questSystem });
       return true;
     }
     return false;
@@ -139,7 +141,12 @@ export class DialogueSystem {
 
   _resolveNode(node, player) {
     if (!node) return null;
-    const choices = (node.choices ?? []).filter(c => !c.condition || c.condition(player));
+    const qs = this._questSystem;
+    const choices = (node.choices ?? []).filter(c => {
+      if (c.condition && !c.condition(player)) return false;
+      if (c.action === 'quest_offer' && c.questId && qs) return qs.isOfferable(c.questId);
+      return true;
+    });
     // Substitute null speaker with the current NPC's name
     const speaker = node.speaker ?? this.currentNPC?.name ?? '???';
     return { ...node, speaker, choices };

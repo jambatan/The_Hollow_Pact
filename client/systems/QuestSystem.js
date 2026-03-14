@@ -25,11 +25,24 @@ export class QuestSystem {
     }
   }
 
+  // Whether the quest can currently be offered to the player
+  isOfferable(questId) {
+    if (this.active.has(questId)) return false;
+    const def = this.questDB[questId];
+    if (!def) return false;
+    if (this.completed.has(questId) && !def.repeatable) return false;
+    return true;
+  }
+
   // NPC offers a quest
   offer(questId, npc, player, events) {
-    if (this.active.has(questId) || this.completed.has(questId)) return;
+    if (this.active.has(questId)) return;
     const def = this.questDB[questId];
     if (!def) return;
+    // Completed non-repeatable quests cannot be re-offered
+    if (this.completed.has(questId) && !def.repeatable) return;
+    // Reset completion so the quest can run again
+    if (this.completed.has(questId)) this.completed.delete(questId);
     this.active.set(questId, { def, stage: 0, progress: {} });
     if (this.trackedIds.size < 3) this.trackedIds.add(questId); // auto-track new quests
     events.emit(EVENTS.QUEST_UPDATED, { questId, status: 'accepted' });

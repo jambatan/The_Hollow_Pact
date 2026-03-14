@@ -317,5 +317,38 @@ export const ENEMY_DB = {
       "mire_common",
       "random equipment rare"
     ]
+  },
+  "bandit_spy": {
+    "id": "bandit_spy",
+    "name": "Bandit",
+    "sprite": "bandit",
+    "aiType": "chase",
+    "aggroRange": 5,
+    "attackRange": 16,
+    "attackSpeed": 1,
+    "stats": {
+      "STR": 3,
+      "DEX": 5,
+      "INT": 3,
+      "CON": 3,
+      "WIS": 3,
+      "CHA": 3
+    },
+    "dropTable": [
+      {
+        "itemId": "health_potion_large",
+        "chance": 1,
+        "qty": 2
+      }
+    ],
+    "goldRange": [
+      20,
+      50
+    ],
+    "xpReward": 50,
+    "level": 1,
+    "lootTableIds": [
+      "random equipment rare"
+    ]
   }
 };
